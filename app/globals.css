@@ -57,6 +57,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .primary { min-height: 36px; padding: 0 14px; border-radius: 8px; background: var(--green); color: #04150b; font-size: 9px; font-weight: 800; transition: .15s var(--ease); }.primary:hover { background: #50e493; transform: translateY(-1px); }
 .page { padding: 20px 22px 28px; }
 .task-layout { display: grid; grid-template-columns: minmax(660px,1fr) 318px; gap: 15px; align-items: start; }
+.task-layout.files-mode { grid-template-columns: minmax(0,1fr); }
 .task-content { min-width: 0; }
 .metric-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 11px; margin-bottom: 12px; }
 .metric { min-height: 96px; padding: 14px 15px; display: grid; grid-template-columns: 1fr 15px; grid-template-rows: 18px 1fr 16px; overflow: hidden; position: relative; }
@@ -120,6 +121,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .file-picker-backdrop { position: fixed; inset: 0; z-index: 60; padding: 20px; display: grid; place-items: center; background: radial-gradient(circle at 62% 42%,rgba(16,96,52,.16),transparent 37%),rgba(0,0,0,.72); backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); animation: fadeIn .18s ease-out; }
 @keyframes fadeIn { from { opacity: 0; } }
 .spatial-picker { width: min(1120px,calc(100vw - 40px)); height: min(720px,calc(100vh - 40px)); min-height: 560px; display: grid; grid-template-rows: 86px minmax(0,1fr) 66px; overflow: hidden; border: 1px solid rgba(255,255,255,.14); border-radius: 22px; background: linear-gradient(145deg,rgba(30,39,34,.76),rgba(8,12,10,.87)); box-shadow: inset 0 1px rgba(255,255,255,.09),0 40px 110px rgba(0,0,0,.66); backdrop-filter: blur(34px) saturate(145%); -webkit-backdrop-filter: blur(34px) saturate(145%); animation: spatialOpen .32s var(--ease); }
+.spatial-picker.embedded { width: 100%; height: min(620px,calc(100vh - 230px)); min-height: 500px; grid-template-rows: 78px minmax(0,1fr) 62px; border-radius: 14px; box-shadow: inset 0 1px rgba(255,255,255,.09),0 20px 58px rgba(0,0,0,.28); }
+.spatial-picker.embedded .spatial-picker-header { grid-template-columns: 1fr minmax(210px,310px); }
 @keyframes spatialOpen { from { opacity: 0; transform: translateY(18px) scale(.97); } }
 .spatial-picker-header { padding: 0 20px 0 24px; display: grid; grid-template-columns: 1fr minmax(210px,310px) 38px; align-items: center; gap: 16px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg,rgba(255,255,255,.035),transparent); }.spatial-picker-header > div > span { color: var(--green); font-size: 7px; letter-spacing: 1.8px; }.spatial-picker-header h2 { margin: 5px 0 3px; font-size: 17px; }.spatial-picker-header p { margin: 0; color: var(--faint); font-size: 8px; }.spatial-picker-header > button { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 9px; background: rgba(255,255,255,.035); color: var(--muted); font-size: 19px; }
 .file-search { height: 38px; padding: 0 11px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 9px; background: rgba(255,255,255,.035); box-shadow: inset 0 1px rgba(255,255,255,.04); }.file-search span { color: var(--faint); }.file-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 8px; }

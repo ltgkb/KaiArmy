@@ -241,7 +241,7 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
 }) {
   const [projectFilter, setProjectFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
-  const [view, setView] = useState<"board" | "list">("board");
+  const [view, setView] = useState<"files" | "board" | "list">("files");
   const [comment, setComment] = useState("");
   const [showDocPicker, setShowDocPicker] = useState(false);
   const selected = workspace.tasks.find((task) => task.id === selectedTaskId);
@@ -254,7 +254,7 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
   const dueToday = workspace.tasks.filter((task) => task.dueAt.startsWith(today) && task.status !== "done").length;
 
   return (
-    <div className="task-layout">
+    <div className={`task-layout ${view === "files" ? "files-mode" : ""}`}>
       <section className="task-content">
         <div className="metric-grid">
           <Metric label="今日待办" value={dueToday} detail="需要关注" tone="blue" />
@@ -264,9 +264,18 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
         </div>
         <div className="toolbar panel">
           <div><select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">全部项目</option>{workspace.projects.filter((project) => !project.archived).map((project) => <option value={project.id} key={project.id}>{project.name}</option>)}</select><select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}><option value="all">全部优先级</option><option value="high">高优先级</option><option value="medium">中优先级</option><option value="low">低优先级</option></select><span>{filtered.length} 个任务</span></div>
-          <div className="segmented"><button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>看板</button><button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>列表</button></div>
+          <div className="segmented"><button className={view === "files" ? "active" : ""} onClick={() => setView("files")}>空间文件</button><button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>看板</button><button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>列表</button></div>
         </div>
-        {view === "board" ? (
+        {view === "files" && selected ? (
+          <SpatialFilePicker
+            embedded
+            docs={workspace.docs}
+            selectedIds={selected.docIds}
+            taskTitle={selected.title}
+            onClose={() => setView("board")}
+            onSave={(docIds) => onLinkDocs(selected.id, docIds)}
+          />
+        ) : view === "board" ? (
           <div className="kanban">
             {statusOrder.map((status) => {
               const tasks = filtered.filter((task) => task.status === status);
@@ -288,7 +297,7 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
           </div>
         )}
       </section>
-      {selected ? (
+      {view !== "files" && selected ? (
         <aside className="task-drawer panel">
           <header><div><span>{selected.id}</span><StatusBadge status={selected.status} /></div><button aria-label="更多操作">•••</button></header>
           <h2>{selected.title}</h2>
@@ -306,12 +315,12 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
           <footer><button className="danger-button" onClick={() => onDelete(selected.id)}>删除</button><button onClick={() => onEdit(selected)}>编辑详情</button><button className="primary" onClick={() => onUpdate(selected.id, { status: selected.status === "done" ? "develop" : "done" })}>{selected.status === "done" ? "重新打开" : "✓ 完成任务"}</button></footer>
           {showDocPicker && <SpatialFilePicker docs={workspace.docs} selectedIds={selected.docIds} taskTitle={selected.title} onClose={() => setShowDocPicker(false)} onSave={(docIds) => { onLinkDocs(selected.id, docIds); setShowDocPicker(false); }} />}
         </aside>
-      ) : <aside className="task-drawer panel empty-state"><span>◇</span><h3>选择一个任务</h3><p>查看详情、评论和关联文档</p></aside>}
+      ) : view !== "files" ? <aside className="task-drawer panel empty-state"><span>◇</span><h3>选择一个任务</h3><p>查看详情、评论和关联文档</p></aside> : null}
     </div>
   );
 }
 
-function SpatialFilePicker({ docs, selectedIds, taskTitle, onClose, onSave }: { docs: Doc[]; selectedIds: string[]; taskTitle: string; onClose: () => void; onSave: (ids: string[]) => void }) {
+function SpatialFilePicker({ docs, selectedIds, taskTitle, onClose, onSave, embedded = false }: { docs: Doc[]; selectedIds: string[]; taskTitle: string; onClose: () => void; onSave: (ids: string[]) => void; embedded?: boolean }) {
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<string[]>(selectedIds);
   const [focusId, setFocusId] = useState(selectedIds[0] ?? docs[0]?.id ?? "");
@@ -345,13 +354,12 @@ function SpatialFilePicker({ docs, selectedIds, taskTitle, onClose, onSave }: { 
     return () => window.removeEventListener("keydown", handleKey);
   }, [activeDoc, onClose, visible]);
 
-  return (
-    <div className="file-picker-backdrop" onMouseDown={onClose}>
-      <section className="spatial-picker" onMouseDown={(event) => event.stopPropagation()} aria-label="空间文件选择器">
+  const picker = (
+      <section className={`spatial-picker ${embedded ? "embedded" : ""}`} onMouseDown={(event) => event.stopPropagation()} aria-label={embedded ? "空间文件工作区" : "空间文件选择器"}>
         <header className="spatial-picker-header">
-          <div><span>SPATIAL FILES</span><h2>选取关联文件</h2><p>关联到「{taskTitle}」· 左右滑动抽取文件</p></div>
+          <div><span>SPATIAL FILES</span><h2>{embedded ? "项目文件流" : "选取关联文件"}</h2><p>当前任务「{taskTitle}」· 左右滑动抽取文件</p></div>
           <label className="file-search"><span>⌕</span><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索文件…" /></label>
-          <button aria-label="关闭文件选择器" onClick={onClose}>×</button>
+          {!embedded && <button aria-label="关闭文件选择器" onClick={onClose}>×</button>}
         </header>
         <div
           className="spatial-stage"
@@ -418,10 +426,10 @@ function SpatialFilePicker({ docs, selectedIds, taskTitle, onClose, onSave }: { 
             <div className="spatial-empty"><span>◇</span><strong>没有匹配的文件</strong><p>换一个关键词试试</p></div>
           )}
         </div>
-        <footer className="spatial-picker-footer"><div><span>已选择 <strong>{picked.length}</strong> 个文件</span>{picked.length > 0 && <button onClick={() => setPicked([])}>清空选择</button>}</div><button onClick={onClose}>取消</button><button className="primary" onClick={() => onSave(picked)}>确认关联 · {picked.length}</button></footer>
+        <footer className="spatial-picker-footer"><div><span>已选择 <strong>{picked.length}</strong> 个文件</span>{picked.length > 0 && <button onClick={() => setPicked([])}>清空选择</button>}</div><button onClick={embedded ? () => setPicked(selectedIds) : onClose}>{embedded ? "恢复当前关联" : "取消"}</button><button className="primary" onClick={() => onSave(picked)}>确认关联 · {picked.length}</button></footer>
       </section>
-    </div>
   );
+  return embedded ? picker : <div className="file-picker-backdrop" onMouseDown={onClose}>{picker}</div>;
 }
 
 function TaskCard({ task, workspace, selected, onClick }: { task: Task; workspace: WorkspaceState; selected: boolean; onClick: () => void }) {

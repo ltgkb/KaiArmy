@@ -25,6 +25,8 @@ test("ships the complete KaiArmy module surface", async () => {
   assert.match(page, /DocFormModal/);
   assert.match(page, /EventFormModal/);
   assert.match(page, /SpatialFilePicker/);
+  assert.match(page, /空间文件工作区/);
+  assert.match(page, /项目文件流/);
   assert.match(page, /onWheel=/);
   assert.match(page, /onPointerDown=/);
   assert.match(page, /ArrowRight/);

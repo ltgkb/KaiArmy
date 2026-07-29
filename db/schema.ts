@@ -1,9 +1,4 @@
-import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-
-export const workspaceStates = sqliteTable("workspace_states", {
-  id: integer("id").primaryKey(),
-  payload: text("payload").notNull(),
-  version: integer("version").notNull().default(1),
-  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-});
+// Intentionally empty by default.
+// Add Drizzle tables here when the site actually needs a database.
+// See examples/d1/db/schema.ts for an opt-in example.
+export {};

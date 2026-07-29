@@ -57,11 +57,11 @@ function uid(prefix: string) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric" }).format(new Date(value));
+  return new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric", timeZone: "Asia/Shanghai" }).format(new Date(value));
 }
 
 function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+  return new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Shanghai" }).format(new Date(value));
 }
 
 function isOverdue(task: Task) {
@@ -241,20 +241,26 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
 }) {
   const [projectFilter, setProjectFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
-  const [view, setView] = useState<"files" | "board" | "list">("files");
+  const [view, setView] = useState<"dashboard" | "board" | "list">("dashboard");
+  const [scope, setScope] = useState<"all" | "mine" | "joined">("all");
   const [comment, setComment] = useState("");
   const [showDocPicker, setShowDocPicker] = useState(false);
   const selected = workspace.tasks.find((task) => task.id === selectedTaskId);
   const filtered = workspace.tasks.filter((task) => {
     const query = `${task.id}${task.title}${task.tags.join("")}`.toLowerCase();
-    return query.includes(search.toLowerCase()) && (projectFilter === "all" || task.projectId === projectFilter) && (priorityFilter === "all" || task.priority === priorityFilter);
+    const matchesScope = scope === "all" || (scope === "mine" ? task.assigneeId === "m1" : task.participantIds.includes("m1"));
+    return query.includes(search.toLowerCase()) && matchesScope && (projectFilter === "all" || task.projectId === projectFilter) && (priorityFilter === "all" || task.priority === priorityFilter);
   });
   const overdue = workspace.tasks.filter(isOverdue).length;
   const today = new Date().toISOString().slice(0, 10);
   const dueToday = workspace.tasks.filter((task) => task.dueAt.startsWith(today) && task.status !== "done").length;
+  const toggleLinkedDoc = (docId: string) => {
+    if (!selected) return;
+    onLinkDocs(selected.id, selected.docIds.includes(docId) ? selected.docIds.filter((id) => id !== docId) : [...selected.docIds, docId]);
+  };
 
   return (
-    <div className={`task-layout ${view === "files" ? "files-mode" : ""}`}>
+    <div className={`task-layout ${view === "dashboard" ? "dashboard-mode" : ""}`}>
       <section className="task-content">
         <div className="metric-grid">
           <Metric label="今日待办" value={dueToday} detail="需要关注" tone="blue" />
@@ -262,19 +268,33 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
           <Metric label="已完成" value={workspace.tasks.filter((task) => task.status === "done").length} detail="本周期累计" tone="neutral" />
           <Metric label="逾期任务" value={overdue} detail={overdue ? "建议立即处理" : "状态良好"} tone={overdue ? "red" : "green"} />
         </div>
-        <div className="toolbar panel">
-          <div><select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">全部项目</option>{workspace.projects.filter((project) => !project.archived).map((project) => <option value={project.id} key={project.id}>{project.name}</option>)}</select><select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}><option value="all">全部优先级</option><option value="high">高优先级</option><option value="medium">中优先级</option><option value="low">低优先级</option></select><span>{filtered.length} 个任务</span></div>
-          <div className="segmented"><button className={view === "files" ? "active" : ""} onClick={() => setView("files")}>空间文件</button><button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>看板</button><button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>列表</button></div>
+        <div className="command-heading"><div><h2>任务看板</h2><p>任务、文件、进度与风险一屏联动</p></div><span>{filtered.length} 项任务</span></div>
+        <div className="command-toolbar panel">
+          <div className="scope-tabs"><button className={scope === "all" ? "active" : ""} onClick={() => setScope("all")}>全部任务</button><button className={scope === "mine" ? "active" : ""} onClick={() => setScope("mine")}>我负责的</button><button className={scope === "joined" ? "active" : ""} onClick={() => setScope("joined")}>我参与的</button></div>
+          <div className="filter-controls"><select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">全部项目</option>{workspace.projects.filter((project) => !project.archived).map((project) => <option value={project.id} key={project.id}>{project.name}</option>)}</select><select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}><option value="all">全部优先级</option><option value="high">高优先级</option><option value="medium">中优先级</option><option value="low">低优先级</option></select></div>
+          <div className="segmented"><button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}>驾驶舱</button><button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>看板</button><button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>列表</button></div>
         </div>
-        {view === "files" && selected ? (
-          <SpatialFilePicker
-            embedded
-            docs={workspace.docs}
-            selectedIds={selected.docIds}
-            taskTitle={selected.title}
-            onClose={() => setView("board")}
-            onSave={(docIds) => onLinkDocs(selected.id, docIds)}
-          />
+        {view === "dashboard" && selected ? (
+          <div className="command-grid">
+            <CompactTaskPanel tasks={filtered} selectedTaskId={selectedTaskId} onSelect={onSelect} onCreate={onCreate} />
+            <CommandFileDeck
+              docs={workspace.docs}
+              selectedIds={selected.docIds}
+              project={workspace.projects.find((project) => project.id === selected.projectId)}
+              tasks={workspace.tasks}
+              onToggle={toggleLinkedDoc}
+              onManage={() => setShowDocPicker(true)}
+            />
+            <CommandInspector
+              task={selected}
+              workspace={workspace}
+              onUpdate={onUpdate}
+              onEdit={() => onEdit(selected)}
+              onDelete={() => onDelete(selected.id)}
+              onManageFiles={() => setShowDocPicker(true)}
+            />
+            <ProjectTimeline tasks={filtered} selectedTaskId={selectedTaskId} onSelect={onSelect} />
+          </div>
         ) : view === "board" ? (
           <div className="kanban">
             {statusOrder.map((status) => {
@@ -297,7 +317,7 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
           </div>
         )}
       </section>
-      {view !== "files" && selected ? (
+      {view !== "dashboard" && selected ? (
         <aside className="task-drawer panel">
           <header><div><span>{selected.id}</span><StatusBadge status={selected.status} /></div><button aria-label="更多操作">•••</button></header>
           <h2>{selected.title}</h2>
@@ -315,8 +335,116 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
           <footer><button className="danger-button" onClick={() => onDelete(selected.id)}>删除</button><button onClick={() => onEdit(selected)}>编辑详情</button><button className="primary" onClick={() => onUpdate(selected.id, { status: selected.status === "done" ? "develop" : "done" })}>{selected.status === "done" ? "重新打开" : "✓ 完成任务"}</button></footer>
           {showDocPicker && <SpatialFilePicker docs={workspace.docs} selectedIds={selected.docIds} taskTitle={selected.title} onClose={() => setShowDocPicker(false)} onSave={(docIds) => { onLinkDocs(selected.id, docIds); setShowDocPicker(false); }} />}
         </aside>
-      ) : view !== "files" ? <aside className="task-drawer panel empty-state"><span>◇</span><h3>选择一个任务</h3><p>查看详情、评论和关联文档</p></aside> : null}
+      ) : view !== "dashboard" ? <aside className="task-drawer panel empty-state"><span>◇</span><h3>选择一个任务</h3><p>查看详情、评论和关联文档</p></aside> : null}
+      {view === "dashboard" && selected && showDocPicker && <SpatialFilePicker docs={workspace.docs} selectedIds={selected.docIds} taskTitle={selected.title} onClose={() => setShowDocPicker(false)} onSave={(docIds) => { onLinkDocs(selected.id, docIds); setShowDocPicker(false); }} />}
     </div>
+  );
+}
+
+function CompactTaskPanel({ tasks, selectedTaskId, onSelect, onCreate }: { tasks: Task[]; selectedTaskId: string; onSelect: (id: string) => void; onCreate: () => void }) {
+  const groups = [
+    { key: "review", label: "需求评审", statuses: ["review"] as TaskStatus[], color: "#35d87e" },
+    { key: "design", label: "产品设计", statuses: ["design"] as TaskStatus[], color: "#4ba6ff" },
+    { key: "build", label: "开发实现", statuses: ["todo","develop","test"] as TaskStatus[], color: "#a96ef2" },
+    { key: "done", label: "已完成", statuses: ["done"] as TaskStatus[], color: "#8f9792" },
+  ];
+  return (
+    <section className="compact-task-panel panel">
+      <header><div><span>任务队列</span><strong>按阶段推进</strong></div><button onClick={onCreate}>＋</button></header>
+      <div className="compact-task-scroll">
+        {groups.map((group) => {
+          const groupTasks = tasks.filter((task) => group.statuses.includes(task.status));
+          return (
+            <section className="compact-task-group" key={group.key}>
+              <header><i style={{ background: group.color }}></i><strong>{group.label}</strong><span>{groupTasks.length}</span><b>⌄</b></header>
+              {groupTasks.slice(0, 4).map((task) => (
+                <button key={task.id} className={task.id === selectedTaskId ? "active" : ""} onClick={() => onSelect(task.id)}>
+                  <small>{task.id}</small><strong>{task.title}</strong><PriorityBadge priority={task.priority} /><span>{isOverdue(task) ? "已逾期" : formatDateTime(task.dueAt)}</span>
+                </button>
+              ))}
+              {!groupTasks.length && <p>暂无任务</p>}
+            </section>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function CommandFileDeck({ docs, selectedIds, project, tasks, onToggle, onManage }: { docs: Doc[]; selectedIds: string[]; project?: Project; tasks: Task[]; onToggle: (id: string) => void; onManage: () => void }) {
+  const [focusId, setFocusId] = useState(selectedIds[0] ?? docs[0]?.id ?? "");
+  const pointerStart = useRef<number | null>(null);
+  const focusIndex = Math.max(0, docs.findIndex((doc) => doc.id === focusId));
+  const activeDoc = docs[focusIndex];
+  const projectTasks = tasks.filter((task) => task.projectId === project?.id);
+  const completion = projectTasks.length ? Math.round(projectTasks.filter((task) => task.status === "done").length / projectTasks.length * 100) : 0;
+  const move = (direction: number) => {
+    if (!docs.length) return;
+    setFocusId(docs[(focusIndex + direction + docs.length) % docs.length].id);
+  };
+  return (
+    <section className="command-files panel" aria-label="项目空间文件">
+      <header><div><span>项目文档</span><strong>{project?.name ?? "当前项目"}</strong></div><button onClick={onManage}>管理关联 ↗</button></header>
+      <div className="command-file-stage" onPointerDown={(event) => { pointerStart.current = event.clientX; }} onPointerUp={(event) => { if (pointerStart.current === null) return; const distance = event.clientX - pointerStart.current; if (Math.abs(distance) > 32) move(distance > 0 ? -1 : 1); pointerStart.current = null; }}>
+        {activeDoc && <aside><span>项目文档</span><h3>{activeDoc.name}</h3><small>v{activeDoc.version} · {project?.name}</small><strong>{completion}%</strong><p>项目完成度</p><button className={selectedIds.includes(activeDoc.id) ? "linked" : ""} onClick={() => onToggle(activeDoc.id)}>{selectedIds.includes(activeDoc.id) ? "✓ 已关联当前任务" : "＋ 关联当前任务"}</button></aside>}
+        <div className="command-file-deck">
+          {docs.map((doc, index) => {
+            let offset = index - focusIndex;
+            if (docs.length > 2 && offset > docs.length / 2) offset -= docs.length;
+            if (docs.length > 2 && offset < -docs.length / 2) offset += docs.length;
+            const distance = Math.abs(offset);
+            const style = {
+              "--mini-x": `${offset * 78}px`,
+              "--mini-y": `${distance * 7}px`,
+              "--mini-rotate": `${offset === 0 ? 0 : offset < 0 ? 54 : -54}deg`,
+              "--mini-scale": `${Math.max(.72,1 - distance * .08)}`,
+              zIndex: 20 - distance,
+            } as CSSProperties;
+            return <button key={doc.id} style={style} className={`command-file-card ${offset === 0 ? "active" : ""} ${selectedIds.includes(doc.id) ? "linked" : ""}`} onClick={() => setFocusId(doc.id)} aria-label={`聚焦文件 ${doc.name}`}><i></i><span className="doc-lines"></span><div><small>{doc.type.toUpperCase()} · v{doc.version}</small><strong>{doc.name}</strong><span>♟ {doc.taskIds.length}</span></div></button>;
+          })}
+        </div>
+        <div className="command-file-controls"><button aria-label="上一个项目文件" onClick={() => move(-1)}>←</button><span>{focusIndex + 1} / {docs.length}</span><button aria-label="下一个项目文件" onClick={() => move(1)}>→</button></div>
+      </div>
+    </section>
+  );
+}
+
+function CommandInspector({ task, workspace, onUpdate, onEdit, onDelete, onManageFiles }: { task: Task; workspace: WorkspaceState; onUpdate: (id: string, patch: Partial<Task>) => void; onEdit: () => void; onDelete: () => void; onManageFiles: () => void }) {
+  const member = workspace.members.find((item) => item.id === task.assigneeId);
+  const project = workspace.projects.find((item) => item.id === task.projectId);
+  const suggestion = isOverdue(task) ? "检测到任务已经逾期，建议调整截止时间并同步项目负责人。" : task.priority === "high" ? "建议关联相似历史文档，并为高优先级任务拆分验收节点。" : "当前任务风险可控，建议在截止日前完成一次状态复核。";
+  return (
+    <aside className="command-inspector panel">
+      <header><div><span>✦</span><strong>智能详情</strong></div><button aria-label="更多任务操作">•••</button></header>
+      <section className="inspector-title"><small>{task.id}</small><div><h2>{task.title}</h2><PriorityBadge priority={task.priority} /></div><p>{task.description}</p></section>
+      <dl>
+        <div><dt>负责人</dt><dd><Avatar label={member?.avatar ?? "?"} />{member?.name}</dd></div>
+        <div><dt>所属项目</dt><dd>▱ {project?.name}</dd></div>
+        <div><dt>截止时间</dt><dd>▣ {formatDateTime(task.dueAt)}</dd></div>
+        <div><dt>当前状态</dt><dd><StatusBadge status={task.status} /></dd></div>
+        <div><dt>关联文件</dt><dd><button onClick={onManageFiles}>{task.docIds.length} 个 · 管理</button></dd></div>
+      </dl>
+      <section className="inspector-tags"><span>标签</span><div>{task.tags.map((tag) => <b key={tag}>{tag}</b>)}<button onClick={onEdit}>＋</button></div></section>
+      <section className="inspector-ai"><span>AI 助手建议</span><p>• {suggestion}</p><p>• 当前项目共有 {workspace.tasks.filter((item) => item.projectId === task.projectId).length} 项任务，{workspace.tasks.filter((item) => item.projectId === task.projectId && item.status === "done").length} 项已完成。</p><button onClick={onEdit}>查看建议详情</button></section>
+      <footer><button onClick={onEdit}>✎ 编辑任务</button><button className="primary" onClick={() => onUpdate(task.id, { status: task.status === "done" ? "develop" : "done" })}>{task.status === "done" ? "重新打开" : "✓ 完成任务"}</button><button className="danger-icon" aria-label="删除任务" onClick={onDelete}>•••</button></footer>
+    </aside>
+  );
+}
+
+function ProjectTimeline({ tasks, selectedTaskId, onSelect }: { tasks: Task[]; selectedTaskId: string; onSelect: (id: string) => void }) {
+  const rows = tasks.filter((task) => task.status !== "done").slice(0, 4);
+  const dates = Array.from({ length: 12 }, (_, index) => index + 29);
+  return (
+    <section className="command-timeline panel">
+      <header><div><span>〽</span><strong>项目时间线</strong><small>2026 年 7–8 月</small></div><div><button>周⌄</button><button>今天</button></div></header>
+      <div className="timeline-scale">{dates.map((date) => <span key={date}>{date > 31 ? date - 31 : date}</span>)}</div>
+      <div className="timeline-rows">
+        {rows.map((task, index) => {
+          const style = { "--bar-left": `${9 + index * 11}%`, "--bar-width": `${32 + (index % 3) * 8}%` } as CSSProperties;
+          return <div key={task.id}><span>{statusInfo[task.status].label}</span><button style={style} className={task.id === selectedTaskId ? "active" : ""} onClick={() => onSelect(task.id)}>{task.title}<small>{formatDate(task.dueAt)}</small></button></div>;
+        })}
+      </div>
+    </section>
   );
 }
 

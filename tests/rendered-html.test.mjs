@@ -27,6 +27,11 @@ test("ships the complete KaiArmy module surface", async () => {
   assert.match(page, /SpatialFilePicker/);
   assert.match(page, /空间文件工作区/);
   assert.match(page, /项目文件流/);
+  assert.match(page, /CompactTaskPanel/);
+  assert.match(page, /CommandFileDeck/);
+  assert.match(page, /CommandInspector/);
+  assert.match(page, /ProjectTimeline/);
+  assert.match(page, /驾驶舱/);
   assert.match(page, /onWheel=/);
   assert.match(page, /onPointerDown=/);
   assert.match(page, /ArrowRight/);

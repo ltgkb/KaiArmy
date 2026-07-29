@@ -17,15 +17,15 @@ type Task = {
 };
 
 const seedTasks: Task[] = [
-  { id: "WXB-2025-001", title: "需求评审会", status: "review", priority: "high", due: "今天 10:00", assignee: "BR", description: "与业务团队对齐需求范围，明确核心目标与验收标准，输出需求评审结论。", tags: ["关键路径", "需求", "评审"] },
-  { id: "WXB-2025-002", title: "用户访谈纪要整理", status: "review", priority: "medium", due: "今天 16:30", assignee: "YL", description: "汇总访谈发现，提炼高频需求与关键阻塞点。", tags: ["用户研究"] },
-  { id: "WXB-2025-003", title: "竞品分析报告", status: "review", priority: "low", due: "明天 12:00", assignee: "BR", description: "完成核心竞品能力矩阵与差异化机会分析。", tags: ["研究"] },
-  { id: "WXB-2025-004", title: "工作台信息架构", status: "design", priority: "high", due: "今天 18:00", assignee: "MN", description: "梳理工作台导航与信息层级。", tags: ["设计"] },
-  { id: "WXB-2025-005", title: "移动端交互流程", status: "design", priority: "medium", due: "5月26日", assignee: "YL", description: "输出移动端核心任务闭环交互。", tags: ["交互"] },
-  { id: "WXB-2025-006", title: "视觉规范 V2", status: "design", priority: "low", due: "5月27日", assignee: "MN", description: "统一组件状态与动效规范。", tags: ["视觉"] },
-  { id: "WXB-2025-007", title: "权限中心接口", status: "develop", priority: "high", due: "今天 20:00", assignee: "ZW", description: "实现角色与资源的权限校验接口。", tags: ["后端"] },
-  { id: "WXB-2025-008", title: "任务看板拖拽", status: "develop", priority: "medium", due: "5月29日", assignee: "LX", description: "完成看板列间拖拽及状态同步。", tags: ["前端"] },
-  { id: "WXB-2025-009", title: "通知服务联调", status: "develop", priority: "low", due: "5月30日", assignee: "ZW", description: "验证站内信与邮件通知链路。", tags: ["联调"] },
+  { id: "KAI-2025-001", title: "需求评审会", status: "review", priority: "high", due: "今天 10:00", assignee: "BR", description: "与业务团队对齐需求范围，明确核心目标与验收标准，输出需求评审结论。", tags: ["关键路径", "需求", "评审"] },
+  { id: "KAI-2025-002", title: "用户访谈纪要整理", status: "review", priority: "medium", due: "今天 16:30", assignee: "YL", description: "汇总访谈发现，提炼高频需求与关键阻塞点。", tags: ["用户研究"] },
+  { id: "KAI-2025-003", title: "竞品分析报告", status: "review", priority: "low", due: "明天 12:00", assignee: "BR", description: "完成核心竞品能力矩阵与差异化机会分析。", tags: ["研究"] },
+  { id: "KAI-2025-004", title: "工作台信息架构", status: "design", priority: "high", due: "今天 18:00", assignee: "MN", description: "梳理工作台导航与信息层级。", tags: ["设计"] },
+  { id: "KAI-2025-005", title: "移动端交互流程", status: "design", priority: "medium", due: "5月26日", assignee: "YL", description: "输出移动端核心任务闭环交互。", tags: ["交互"] },
+  { id: "KAI-2025-006", title: "视觉规范 V2", status: "design", priority: "low", due: "5月27日", assignee: "MN", description: "统一组件状态与动效规范。", tags: ["视觉"] },
+  { id: "KAI-2025-007", title: "权限中心接口", status: "develop", priority: "high", due: "今天 20:00", assignee: "ZW", description: "实现角色与资源的权限校验接口。", tags: ["后端"] },
+  { id: "KAI-2025-008", title: "任务看板拖拽", status: "develop", priority: "medium", due: "5月29日", assignee: "LX", description: "完成看板列间拖拽及状态同步。", tags: ["前端"] },
+  { id: "KAI-2025-009", title: "通知服务联调", status: "develop", priority: "low", due: "5月30日", assignee: "ZW", description: "验证站内信与邮件通知链路。", tags: ["联调"] },
 ];
 
 const navItems = [
@@ -35,7 +35,7 @@ const navItems = [
 
 const docs = [
   ["需求评审报告", "REVIEW", "v2.4"], ["交互流程图", "DESIGN", "v1.8"],
-  ["产品原型", "PROTO", "v3.2"], ["WenXiBuddy PRD", "PRD", "v5.0"],
+  ["产品原型", "PROTO", "v3.2"], ["KaiBuddy PRD", "PRD", "v5.0"],
 ];
 
 const statusMeta: Record<Status, { label: string; number: string }> = {
@@ -89,7 +89,7 @@ export default function Home() {
 
   const addTask = () => {
     if (!newTitle.trim()) return;
-    const next = `WXB-2025-${String(tasks.length + 1).padStart(3, "0")}`;
+    const next = `KAI-2025-${String(tasks.length + 1).padStart(3, "0")}`;
     const task: Task = { id: next, title: newTitle.trim(), status: newStatus, priority: "medium", due: "明天 18:00", assignee: "BR", description: "新建任务，等待补充详细说明。", tags: ["新任务"] };
     setTasks((all) => [...all, task]);
     setSelectedId(next);
@@ -105,7 +105,7 @@ export default function Home() {
         <section className="module-page">
           <Header title={activeNav} search={search} setSearch={setSearch} onAdd={() => setShowModal(true)} />
           <div className="module-hero glass">
-            <span className="eyebrow">WENXIBUDDY / {activeNav}</span>
+            <span className="eyebrow">KAIBUDDY / {activeNav}</span>
             <h1>{activeNav}</h1>
             <p>该模块已接入统一工作台，数据将与任务、项目和团队视图实时联动。</p>
             <div className="module-grid">
@@ -145,7 +145,7 @@ export default function Home() {
 
           <section className="center-stage">
             <div className="project-head">
-              <div><span className="eyebrow">ACTIVE PROJECT</span><h2>WenXiBuddy 2.0</h2><p>智能任务管理平台 · 产品研发中心</p></div>
+              <div><span className="eyebrow">ACTIVE PROJECT</span><h2>KaiBuddy 2.0</h2><p>智能任务管理平台 · 产品研发中心</p></div>
               <div className="progress-ring"><b>87%</b><span>整体进度</span></div>
             </div>
             <div className="doc-stage glass">
@@ -185,7 +185,7 @@ export default function Home() {
               <p className="description">{selected.description}</p>
               <dl>
                 <div><dt>负责人</dt><dd><span className="avatar small">{selected.assignee}</span> Brandon</dd></div>
-                <div><dt>所属项目</dt><dd>WenXiBuddy 2.0</dd></div>
+                <div><dt>所属项目</dt><dd>KaiBuddy 2.0</dd></div>
                 <div><dt>截止时间</dt><dd>{selected.due}</dd></div>
                 <div><dt>当前状态</dt><dd><i className="green-dot"></i>{statusMeta[selected.status].label}</dd></div>
               </dl>
@@ -213,7 +213,7 @@ export default function Home() {
 
 function Sidebar({ active, onChange }: { active: string; onChange: (x: string) => void }) {
   return <aside className="sidebar">
-    <div className="brand"><span>WB</span><div><strong>WenXiBuddy</strong><small>智能协同工作台</small></div></div>
+    <div className="brand"><span>KB</span><div><strong>KaiBuddy</strong><small>智能协同工作台</small></div></div>
     <nav><small>工作台</small>{navItems.slice(0, 6).map(([icon, label]) => <button className={active === label ? "active" : ""} key={label} onClick={() => onChange(label)}><i>{icon}</i>{label}{label === "任务管理" && <b>12</b>}</button>)}
     <small>资源</small>{navItems.slice(6).map(([icon, label]) => <button className={active === label ? "active" : ""} key={label} onClick={() => onChange(label)}><i>{icon}</i>{label}</button>)}</nav>
     <div className="workspace-switch"><small>我的工作区</small><button><span className="workspace-logo">产</span><span><strong>产品研发中心</strong><small>8 位成员</small></span><b>⌄</b></button></div>

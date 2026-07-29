@@ -24,6 +24,8 @@ test("ships the complete KaiArmy module surface", async () => {
   assert.match(page, /ProjectFormModal/);
   assert.match(page, /DocFormModal/);
   assert.match(page, /EventFormModal/);
+  assert.match(page, /FilePickerDrawer/);
+  assert.match(page, /确认关联/);
   assert.match(page, /协作评论/);
   assert.match(page, /恢复演示数据/);
 });

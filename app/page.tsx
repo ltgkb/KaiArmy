@@ -164,6 +164,18 @@ export default function Home() {
                 patchWorkspace({ comments: [...workspace.comments, { id: uid("c"), taskId: selectedTask.id, authorId: "m1", content, createdAt: new Date().toISOString() }] });
                 announce("评论已发布");
               }}
+              onLinkDocs={(taskId, docIds) => {
+                patchWorkspace({
+                  tasks: workspace.tasks.map((task) => task.id === taskId ? { ...task, docIds, updatedAt: new Date().toISOString() } : task),
+                  docs: workspace.docs.map((doc) => ({
+                    ...doc,
+                    taskIds: docIds.includes(doc.id)
+                      ? Array.from(new Set([...doc.taskIds, taskId]))
+                      : doc.taskIds.filter((id) => id !== taskId),
+                  })),
+                });
+                announce(`已更新 ${docIds.length} 个关联文件`);
+              }}
             />
           )}
           {activeModule === "项目总览" && <ProjectOverview workspace={workspace} search={search} onChange={patchWorkspace} onCreate={() => setModal({ kind: "project" })} announce={announce} />}
@@ -221,15 +233,17 @@ function Header({ activeModule, search, setSearch, syncState, actionLabel, onAct
   );
 }
 
-function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate, onDelete, onEdit, onCreate, onComment }: {
+function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate, onDelete, onEdit, onCreate, onComment, onLinkDocs }: {
   workspace: WorkspaceState; search: string; selectedTaskId: string; onSelect: (id: string) => void;
   onUpdate: (id: string, patch: Partial<Task>) => void; onDelete: (id: string) => void;
   onEdit: (task: Task) => void; onCreate: () => void; onComment: (content: string) => void;
+  onLinkDocs: (taskId: string, docIds: string[]) => void;
 }) {
   const [projectFilter, setProjectFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [view, setView] = useState<"board" | "list">("board");
   const [comment, setComment] = useState("");
+  const [showDocPicker, setShowDocPicker] = useState(false);
   const selected = workspace.tasks.find((task) => task.id === selectedTaskId);
   const filtered = workspace.tasks.filter((task) => {
     const query = `${task.id}${task.title}${task.tags.join("")}`.toLowerCase();
@@ -286,12 +300,42 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
             <label>优先级<select value={selected.priority} onChange={(event) => onUpdate(selected.id, { priority: event.target.value as Priority })}><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></label>
             <label className="full">截止时间<input type="datetime-local" value={selected.dueAt.slice(0, 16)} onChange={(event) => onUpdate(selected.id, { dueAt: new Date(event.target.value).toISOString() })} /></label>
           </div>
-          <section className="linked-docs"><h3>关联文档 <span>{selected.docIds.length}</span></h3>{workspace.docs.filter((doc) => selected.docIds.includes(doc.id)).map((doc) => <article key={doc.id}><i>▤</i><div><strong>{doc.name}</strong><small>v{doc.version}</small></div></article>)}{!selected.docIds.length && <p className="inline-empty">暂未关联文档</p>}</section>
+          <section className="linked-docs"><h3>关联文件 <span>{selected.docIds.length}</span><button onClick={() => setShowDocPicker(true)}>管理文件 →</button></h3>{workspace.docs.filter((doc) => selected.docIds.includes(doc.id)).map((doc) => <article key={doc.id}><i>▤</i><div><strong>{doc.name}</strong><small>{doc.type.toUpperCase()} · v{doc.version}</small></div><button aria-label={`取消关联 ${doc.name}`} onClick={() => onLinkDocs(selected.id, selected.docIds.filter((id) => id !== doc.id))}>×</button></article>)}{!selected.docIds.length && <button className="inline-empty file-empty" onClick={() => setShowDocPicker(true)}>＋ 从文件归档中选取</button>}</section>
           <section className="ai-note"><span>✦ 智能建议</span><strong>{isOverdue(selected) ? "任务已经逾期，建议重新排期或转交。" : selected.priority === "high" ? "这是高优先级任务，建议拆分验收节点。" : "当前任务状态正常。"}</strong></section>
           <section className="comments"><h3>协作评论 <span>{workspace.comments.filter((item) => item.taskId === selected.id).length}</span></h3><div className="comment-list">{workspace.comments.filter((item) => item.taskId === selected.id).map((item) => { const author = workspace.members.find((member) => member.id === item.authorId); return <article key={item.id}><Avatar label={author?.avatar ?? "?"} /><div><strong>{author?.name}</strong><p>{item.content}</p><small>{formatDateTime(item.createdAt)}</small></div></article>; })}</div><form onSubmit={(event) => { event.preventDefault(); if (!comment.trim()) return; onComment(comment.trim()); setComment(""); }}><input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="写下评论，支持 @成员…" /><button disabled={!comment.trim()}>发送</button></form></section>
           <footer><button className="danger-button" onClick={() => onDelete(selected.id)}>删除</button><button onClick={() => onEdit(selected)}>编辑详情</button><button className="primary" onClick={() => onUpdate(selected.id, { status: selected.status === "done" ? "develop" : "done" })}>{selected.status === "done" ? "重新打开" : "✓ 完成任务"}</button></footer>
+          {showDocPicker && <FilePickerDrawer docs={workspace.docs} selectedIds={selected.docIds} taskTitle={selected.title} onClose={() => setShowDocPicker(false)} onSave={(docIds) => { onLinkDocs(selected.id, docIds); setShowDocPicker(false); }} />}
         </aside>
       ) : <aside className="task-drawer panel empty-state"><span>◇</span><h3>选择一个任务</h3><p>查看详情、评论和关联文档</p></aside>}
+    </div>
+  );
+}
+
+function FilePickerDrawer({ docs, selectedIds, taskTitle, onClose, onSave }: { docs: Doc[]; selectedIds: string[]; taskTitle: string; onClose: () => void; onSave: (ids: string[]) => void }) {
+  const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState<string[]>(selectedIds);
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+  const visible = docs.filter((doc) => `${doc.name}${doc.content}${doc.type}`.toLowerCase().includes(query.toLowerCase()));
+  const toggle = (id: string) => setPicked((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  return (
+    <div className="file-picker-backdrop" onMouseDown={onClose}>
+      <aside className="file-picker-drawer" onMouseDown={(event) => event.stopPropagation()} aria-label="文件选择器">
+        <header><div><span>FILE PICKER</span><h2>选取关联文件</h2><p>关联到「{taskTitle}」</p></div><button aria-label="关闭文件选择器" onClick={onClose}>×</button></header>
+        <label className="file-search"><span>⌕</span><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索文件名称、类型或内容…" /></label>
+        <div className="picker-summary"><span>已选择 <strong>{picked.length}</strong> 个文件</span>{picked.length > 0 && <button onClick={() => setPicked([])}>清空选择</button>}</div>
+        <div className="file-picker-list">
+          {visible.map((doc) => {
+            const checked = picked.includes(doc.id);
+            return <button className={checked ? "selected" : ""} key={doc.id} onClick={() => toggle(doc.id)}><span className="file-icon">▤</span><div><strong>{doc.name}</strong><small>{doc.type.toUpperCase()} · v{doc.version} · 已关联 {doc.taskIds.length} 个任务</small><p>{doc.content}</p></div><span className="checkmark">{checked ? "✓" : ""}</span></button>;
+          })}
+          {!visible.length && <div className="picker-empty"><span>◇</span><strong>没有匹配的文件</strong><p>换一个关键词试试</p></div>}
+        </div>
+        <footer><button onClick={onClose}>取消</button><button className="primary" onClick={() => onSave(picked)}>确认关联 · {picked.length}</button></footer>
+      </aside>
     </div>
   );
 }

@@ -12,14 +12,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const protocol = host.includes("localhost") ? "http" : "https";
   const image = `${protocol}://${host}/og.png`;
   return {
-    title: "KaiBuddy · 智能任务管理平台",
-    description: "高效规划、智能协同、结果驱动的产品研发工作台。",
+    title: "KaiArmy · 项目任务管理",
+    description: "规划任务、推进状态、协同交付的一体化项目工作台。",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: {
-      title: "KaiBuddy · 智能任务管理平台",
-      description: "高效规划 · 智能协同 · 结果驱动",
+      title: "KaiArmy · 项目任务管理",
+      description: "规划任务 · 推进状态 · 协同交付",
       type: "website",
-      images: [{ url: image, width: 1200, height: 630, alt: "KaiBuddy 智能任务管理平台" }],
+      images: [{ url: image, width: 1200, height: 630, alt: "KaiArmy 项目任务管理" }],
     },
     twitter: { card: "summary_large_image", images: [image] },
   };

@@ -1,30 +1,40 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
-  const host = requestHeaders.get("host") || "localhost:3000";
-  const protocol = host.includes("localhost") ? "http" : "https";
-  const image = `${protocol}://${host}/og.png`;
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
+  const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const base = new URL(`${protocol}://${host}`);
+  const title = "KaiArmy — 智能合同与合规运营平台";
+  const description = "让每一份合同、每一项义务与每一个风险都清晰可见。";
+
   return {
-    title: "KaiArmy · 项目任务管理",
-    description: "规划任务、推进状态、协同交付的一体化项目工作台。",
+    metadataBase: base,
+    title,
+    description,
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: {
-      title: "KaiArmy · 项目任务管理",
-      description: "规划任务 · 推进状态 · 协同交付",
+      title,
+      description,
       type: "website",
-      images: [{ url: image, width: 1200, height: 630, alt: "KaiArmy 项目任务管理" }],
+      locale: "zh_CN",
+      images: [{ url: new URL("/og.png", base).toString(), width: 1200, height: 630, alt: "KaiArmy 智能合同与合规运营平台" }],
     },
-    twitter: { card: "summary_large_image", images: [image] },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [new URL("/og.png", base).toString()],
+    },
   };
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="zh-CN"><body className={`${geistSans.variable} ${geistMono.variable}`}>{children}</body></html>;
+  return (
+    <html lang="zh-CN">
+      <body>{children}</body>
+    </html>
+  );
 }

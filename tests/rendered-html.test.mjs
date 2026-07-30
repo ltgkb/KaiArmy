@@ -24,6 +24,13 @@ test("ships the complete KaiArmy module surface", async () => {
   assert.match(page, /ProjectFormModal/);
   assert.match(page, /DocFormModal/);
   assert.match(page, /EventFormModal/);
+  assert.match(page, /BatchEventModal/);
+  assert.match(page, /批量添加日程/);
+  assert.match(page, /选择日期区间与重复规则/);
+  assert.match(page, /仅工作日/);
+  assert.match(page, /每周（按开始日）/);
+  assert.match(page, /批量管理/);
+  assert.match(page, /deleteSelected/);
   assert.match(page, /SpatialFilePicker/);
   assert.match(page, /空间文件工作区/);
   assert.match(page, /项目文件流/);
@@ -31,6 +38,10 @@ test("ships the complete KaiArmy module surface", async () => {
   assert.match(page, /CommandFileDeck/);
   assert.match(page, /CommandInspector/);
   assert.match(page, /ProjectTimeline/);
+  assert.match(page, /WikiKnowledgeAssistant/);
+  assert.match(page, /WikiCatalogPanel/);
+  assert.match(page, /引用到评论/);
+  assert.match(page, /生成跟进任务/);
   assert.match(page, /驾驶舱/);
   assert.match(page, /onWheel=/);
   assert.match(page, /onPointerDown=/);
@@ -38,6 +49,21 @@ test("ships the complete KaiArmy module surface", async () => {
   assert.match(page, /确认关联/);
   assert.match(page, /协作评论/);
   assert.match(page, /恢复演示数据/);
+});
+
+test("proxies Wiki chat and catalog server-side", async () => {
+  const [chatRoute, catalogRoute] = await Promise.all([
+    read("../app/api/wiki/chat/route.ts"),
+    read("../app/api/wiki/catalog/route.ts"),
+  ]);
+
+  assert.match(chatRoute, /https:\/\/wiki\.kai\.com\/api\/v1\/public-chat/);
+  assert.match(chatRoute, /MAX_MESSAGE_LENGTH = 8_000/);
+  assert.match(chatRoute, /conversation_id/);
+  assert.match(chatRoute, /45_000/);
+  assert.match(catalogRoute, /public-chat\/catalog/);
+  assert.match(catalogRoute, /knowledgeBases/);
+  assert.match(catalogRoute, /Cache-Control/);
 });
 
 test("persists one shared workspace through D1", async () => {

@@ -28,6 +28,18 @@ export type Project = {
   milestones: Array<{ id: string; name: string; dueAt: string; done: boolean }>;
 };
 
+export type DocFileKind = "md" | "csv" | "txt" | "pdf" | "docx";
+
+export type DocFile = {
+  id: string;
+  name: string;
+  kind: DocFileKind;
+  text?: string; // md/csv/txt 的可编辑内容
+  dataUrl?: string; // pdf/docx 上传后的 base64 data URL（只读预览）
+  size: number;
+  updatedAt: string;
+};
+
 export type Doc = {
   id: string;
   name: string;
@@ -35,6 +47,8 @@ export type Doc = {
   version: number;
   taskIds: string[];
   content: string;
+  projectId?: string; // 文档归属项目，支撑项目总览入口
+  files?: DocFile[]; // 文档下的具体文件
   updatedAt: string;
   favorite: boolean;
 };
@@ -77,6 +91,7 @@ export type WorkspaceState = {
     emailNotifications: boolean;
     inAppNotifications: boolean;
     compactMode: boolean;
+    theme: "dark" | "light";
   };
 };
 
@@ -138,11 +153,25 @@ export const defaultWorkspace: WorkspaceState = {
     { id: "KAI-009", title: "Beta 数据埋点", description: "定义核心任务闭环的行为事件。", projectId: "p1", assigneeId: "m4", participantIds: ["m1"], status: "todo", priority: "medium", dueAt: "2026-08-02T18:00:00.000Z", tags: ["数据"], docIds: [], createdAt: now, updatedAt: now },
   ],
   docs: [
-    { id: "d1", name: "KaiArmy 2.0 PRD", type: "prd", version: 5, taskIds: ["KAI-001"], content: "产品目标：让研发团队在一个工作台完成规划、协作与复盘。核心范围包括任务、项目、文件、日程、团队和智能建议。", updatedAt: now, favorite: true },
-    { id: "d2", name: "核心交互规范", type: "design", version: 3, taskIds: ["KAI-002","KAI-004"], content: "看板支持快捷流转；详情编辑与列表实时同步；所有危险操作需要二次确认。", updatedAt: now, favorite: true },
-    { id: "d3", name: "用户研究报告", type: "report", version: 2, taskIds: ["KAI-003","KAI-007"], content: "高频痛点：信息分散、状态不透明、会议结论难追踪。用户希望在任务上下文中直接访问文档。", updatedAt: now, favorite: false },
-    { id: "d4", name: "权限模型说明", type: "spec", version: 1, taskIds: ["KAI-005"], content: "管理员可管理成员与工作区；成员可创建和编辑任务；只读成员仅可查看和评论。", updatedAt: now, favorite: false },
-    { id: "d5", name: "设计系统审计", type: "review", version: 4, taskIds: ["KAI-008"], content: "需要统一表单、弹层、焦点态、空态与错误反馈，并降低非必要玻璃效果。", updatedAt: now, favorite: false },
+    { id: "d1", name: "KaiArmy 2.0 PRD", type: "prd", version: 5, taskIds: ["KAI-001"], projectId: "p1", content: "产品目标：让研发团队在一个工作台完成规划、协作与复盘。核心范围包括任务、项目、文件、日程、团队和智能建议。", updatedAt: now, favorite: true, files: [
+      { id: "f1", name: "产品需求文档.md", kind: "md", size: 512, updatedAt: now, text: "# KaiArmy 2.0 PRD\n\n## 产品目标\n让研发团队在**一个工作台**完成规划、协作与复盘。\n\n## 核心范围\n- 任务管理\n- 项目总览\n- 文件归档\n- 日程管理\n- 团队协作\n- 智能建议\n\n## 成功指标\n- 任务闭环时间下降 30%\n- 跨模块跳转减少 50%" },
+      { id: "f2", name: "需求优先级.csv", kind: "csv", size: 220, updatedAt: now, text: "需求,优先级,负责人,状态\n任务看板,高,Linxi,开发中\n文件预览,高,Mina,设计中\n权限模型,中,Zhiwei,待开始\n智能分析,低,Brandon,规划中" },
+      { id: "f3", name: "评审纪要.pdf", kind: "pdf", size: 0, updatedAt: now },
+    ] },
+    { id: "d2", name: "核心交互规范", type: "design", version: 3, taskIds: ["KAI-002","KAI-004"], projectId: "p1", content: "看板支持快捷流转；详情编辑与列表实时同步；所有危险操作需要二次确认。", updatedAt: now, favorite: true, files: [
+      { id: "f4", name: "交互规范.md", kind: "md", size: 320, updatedAt: now, text: "# 核心交互规范\n\n- 看板支持**快捷流转**\n- 详情编辑与列表实时同步\n- 所有危险操作需要二次确认\n\n## 空态与错误\n- 空态给出明确引导\n- 错误反馈可重试" },
+      { id: "f5", name: "组件清单.csv", kind: "csv", size: 180, updatedAt: now, text: "组件,状态,平台\n按钮,已完成,全端\n弹层,进行中,全端\n表单,待开始,Web" },
+    ] },
+    { id: "d3", name: "用户研究报告", type: "report", version: 2, taskIds: ["KAI-003","KAI-007"], projectId: "p2", content: "高频痛点：信息分散、状态不透明、会议结论难追踪。用户希望在任务上下文中直接访问文档。", updatedAt: now, favorite: false, files: [
+      { id: "f6", name: "研究结论.md", kind: "md", size: 280, updatedAt: now, text: "# 用户研究报告\n\n## 高频痛点\n- 信息分散\n- 状态不透明\n- 会议结论难追踪\n\n## 机会点\n用户希望在**任务上下文**中直接访问文档。" },
+      { id: "f7", name: "访谈记录.txt", kind: "txt", size: 96, updatedAt: now, text: "访谈对象：12 位种子用户\n形式：半结构化访谈\n时长：每人 45 分钟" },
+    ] },
+    { id: "d4", name: "权限模型说明", type: "spec", version: 1, taskIds: ["KAI-005"], projectId: "p1", content: "管理员可管理成员与工作区；成员可创建和编辑任务；只读成员仅可查看和评论。", updatedAt: now, favorite: false, files: [
+      { id: "f8", name: "权限矩阵.csv", kind: "csv", size: 200, updatedAt: now, text: "角色,管理工作区,编辑任务,查看,评论\n管理员,是,是,是,是\n成员,否,是,是,是\n只读,否,否,是,是" },
+    ] },
+    { id: "d5", name: "设计系统审计", type: "review", version: 4, taskIds: ["KAI-008"], projectId: "p3", content: "需要统一表单、弹层、焦点态、空态与错误反馈，并降低非必要玻璃效果。", updatedAt: now, favorite: false, files: [
+      { id: "f9", name: "审计说明.md", kind: "md", size: 240, updatedAt: now, text: "# 设计系统审计\n\n## 待统一项\n- 表单\n- 弹层\n- 焦点态\n- 空态与错误反馈\n\n## 优化\n降低非必要的玻璃效果。" },
+    ] },
   ],
   events: [
     { id: "e1", title: "需求范围确认会", type: "review", date: "2026-07-29", time: "10:00", taskId: "KAI-001" },
@@ -159,5 +188,6 @@ export const defaultWorkspace: WorkspaceState = {
     emailNotifications: true,
     inAppNotifications: true,
     compactMode: false,
+    theme: "dark",
   },
 };

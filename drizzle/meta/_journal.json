@@ -8,6 +8,27 @@
       "when": 1785312786788,
       "tag": "0000_remarkable_clint_barton",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1785816000000,
+      "tag": "0001_secure_workspace_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785902400000,
+      "tag": "0002_email_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1785907200000,
+      "tag": "0003_shared_workspaces",
+      "breakpoints": true
     }
   ]
 }

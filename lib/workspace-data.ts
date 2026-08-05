@@ -191,3 +191,22 @@ export const defaultWorkspace: WorkspaceState = {
     theme: "dark",
   },
 };
+
+export function createEmptyWorkspace(workspaceName: string, displayName: string, userId: string): WorkspaceState {
+  return {
+    members: [{ id: userId, name: displayName, role: "工作区所有者", avatar: displayName.trim().slice(0, 2).toUpperCase() || "KA", online: true }],
+    projects: [],
+    tasks: [],
+    docs: [],
+    events: [],
+    comments: [],
+    settings: {
+      workspaceName,
+      displayName,
+      emailNotifications: true,
+      inAppNotifications: true,
+      compactMode: false,
+      theme: "dark",
+    },
+  };
+}

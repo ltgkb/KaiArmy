@@ -1,4 +1,8 @@
+import { apiJson, getRequestIdentity } from "../../../../lib/api-security";
+
 const WIKI_CATALOG_URL = "https://wiki.kai.com/api/v1/public-chat/catalog";
+const ALLOWED_KNOWLEDGE_BASE_NAMES = new Set(["KAI算期平台知识库"]);
+const ALLOWED_FLOW_NAMES = new Set(["KAI期算平台快速问答API", "KAI期算平台快速问答2"]);
 
 type CatalogResponse = {
   knowledge_bases?: Array<{
@@ -18,7 +22,9 @@ type CatalogResponse = {
   }>;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
+  const identity = await getRequestIdentity(request);
+  if (!identity) return apiJson({ error: "请先登录" }, { status: 401 });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
@@ -27,11 +33,11 @@ export async function GET() {
       signal: controller.signal,
     });
     if (!response.ok) {
-      return Response.json({ error: "无法读取 KAI 知识目录" }, { status: response.status });
+      return apiJson({ error: "无法读取 KAI 知识目录" }, { status: 503 });
     }
     const data = await response.json() as CatalogResponse;
-    return Response.json({
-      knowledgeBases: (data.knowledge_bases ?? []).map((item) => ({
+    return apiJson({
+      knowledgeBases: (data.knowledge_bases ?? []).filter((item) => ALLOWED_KNOWLEDGE_BASE_NAMES.has(item.name)).map((item) => ({
         id: item.id,
         name: item.name,
         description: item.description ?? "",
@@ -39,7 +45,7 @@ export async function GET() {
         documentCount: item.document_count ?? 0,
         status: item.status ?? "unknown",
       })),
-      flows: (data.flows ?? []).map((item) => ({
+      flows: (data.flows ?? []).filter((item) => ALLOWED_FLOW_NAMES.has(item.name)).map((item) => ({
         id: item.id,
         name: item.name,
         description: item.description ?? "",
@@ -48,10 +54,10 @@ export async function GET() {
       })),
       source: "wiki.kai.com",
     }, {
-      headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=300" },
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=300" },
     });
   } catch {
-    return Response.json({ error: "无法连接 KAI 知识目录" }, { status: 504 });
+    return apiJson({ error: "无法连接 KAI 知识目录" }, { status: 504 });
   } finally {
     clearTimeout(timeout);
   }

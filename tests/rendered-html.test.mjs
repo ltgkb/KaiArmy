@@ -48,7 +48,7 @@ test("ships the complete KaiArmy module surface", async () => {
   assert.match(page, /ArrowRight/);
   assert.match(page, /确认关联/);
   assert.match(page, /协作评论/);
-  assert.match(page, /恢复演示数据/);
+  assert.match(page, /清空工作区/);
 });
 
 test("proxies Wiki chat and catalog server-side", async () => {
@@ -61,33 +61,122 @@ test("proxies Wiki chat and catalog server-side", async () => {
   assert.match(chatRoute, /MAX_MESSAGE_LENGTH = 8_000/);
   assert.match(chatRoute, /conversation_id/);
   assert.match(chatRoute, /45_000/);
+  assert.match(chatRoute, /consumeRateLimit/);
+  assert.match(chatRoute, /MAX_UPSTREAM_BYTES/);
+  assert.match(chatRoute, /isSameOriginMutation/);
   assert.match(catalogRoute, /public-chat\/catalog/);
   assert.match(catalogRoute, /knowledgeBases/);
-  assert.match(catalogRoute, /Cache-Control/);
+  assert.match(catalogRoute, /ALLOWED_KNOWLEDGE_BASE_NAMES/);
+  assert.match(catalogRoute, /private, max-age=60/);
 });
 
-test("persists one shared workspace through D1", async () => {
-  const [route, helper, schema, migration, hosting, data] = await Promise.all([
+test("persists isolated versioned workspaces through D1", async () => {
+  const [route, helper, schema, migration, hosting, data, validation] = await Promise.all([
     read("../app/api/workspace/route.ts"),
     read("../db/workspace.ts"),
     read("../db/schema.ts"),
-    read("../drizzle/0000_remarkable_clint_barton.sql"),
+    read("../drizzle/0001_secure_workspace_state.sql"),
     read("../.openai/hosting.json"),
     read("../lib/workspace-data.ts"),
+    read("../lib/workspace-validation.ts"),
   ]);
 
   assert.match(hosting, /"d1":\s*"DB"/);
-  assert.match(schema, /workspaceStates/);
-  assert.match(migration, /CREATE TABLE `workspace_states`/);
-  assert.match(helper, /CREATE TABLE IF NOT EXISTS workspace_states/);
-  assert.match(helper, /ON CONFLICT\(id\) DO UPDATE/);
+  assert.match(schema, /workspaceUserStates/);
+  assert.match(schema, /apiRateLimits/);
+  assert.match(migration, /CREATE TABLE `workspace_user_states`/);
+  assert.match(helper, /CREATE TABLE IF NOT EXISTS workspace_user_states/);
+  assert.match(helper, /WHERE workspace_key = \?1 AND version = \?3/);
   assert.match(route, /export async function GET/);
   assert.match(route, /export async function PUT/);
+  assert.match(route, /resolveWorkspace/);
+  assert.match(route, /activeWorkspace\.id/);
+  assert.match(route, /status: 409/);
+  assert.match(route, /new TextEncoder/);
   assert.match(route, /writeWorkspaceState/);
+  assert.match(validation, /validateWorkspace/);
 
   for (const entity of ["tasks", "projects", "docs", "members", "events", "comments", "settings"]) {
     assert.match(data, new RegExp(`${entity}:`));
   }
+});
+
+test("applies API and worker security boundaries", async () => {
+  const [security, auth, authDb, worker, page, packageJson] = await Promise.all([
+    read("../lib/api-security.ts"),
+    read("../lib/auth.ts"),
+    read("../db/auth.ts"),
+    read("../worker/index.ts"),
+    read("../app/page.tsx"),
+    read("../package.json"),
+  ]);
+
+  assert.match(security, /readSessionIdentity/);
+  assert.match(security, /isSameOriginMutation/);
+  assert.match(security, /sec-fetch-site/);
+  assert.match(security, /Content-Length|content-length/);
+  assert.match(security, /仅支持 JSON 请求/);
+  assert.match(auth, /PBKDF2/);
+  assert.match(auth, /HttpOnly/);
+  assert.match(auth, /SameSite=Lax/);
+  assert.match(auth, /sha256Hex/);
+  assert.match(authDb, /auth_sessions/);
+  assert.match(worker, /Content-Security-Policy/);
+  assert.match(worker, /X-Frame-Options/);
+  assert.match(worker, /X-Request-Id/);
+  assert.match(page, /workspaceVersion/);
+  assert.match(page, /response.status === 409/);
+  assert.match(packageJson, /"next": "16\.3\.0"/);
+});
+
+test("provides email registration, login, logout and isolated sessions", async () => {
+  const [page, register, login, logout, session, migration] = await Promise.all([
+    read("../app/page.tsx"),
+    read("../app/api/auth/register/route.ts"),
+    read("../app/api/auth/login/route.ts"),
+    read("../app/api/auth/logout/route.ts"),
+    read("../app/api/auth/session/route.ts"),
+    read("../drizzle/0002_email_auth.sql"),
+  ]);
+
+  assert.match(page, /登录 KaiArmy/);
+  assert.match(page, /创建你的账号/);
+  assert.match(page, /api\/auth\/logout/);
+  assert.match(register, /hashPassword/);
+  assert.match(register, /readLatestWorkspaceState/);
+  assert.match(register, /consumeRateLimit/);
+  assert.match(login, /verifyPassword/);
+  assert.match(login, /consumeRateLimit/);
+  assert.match(logout, /revokeRequestSession/);
+  assert.match(session, /getRequestIdentity/);
+  assert.match(migration, /CREATE TABLE `users`/);
+  assert.match(migration, /CREATE TABLE `auth_sessions`/);
+});
+
+test("provides shared workspaces and product-grade recovery flows", async () => {
+  const [page, workspaceRoute, workspacesRoute, membersRoute, workspaceDb, migration] = await Promise.all([
+    read("../app/page.tsx"),
+    read("../app/api/workspace/route.ts"),
+    read("../app/api/workspaces/route.ts"),
+    read("../app/api/workspaces/members/route.ts"),
+    read("../db/workspaces.ts"),
+    read("../drizzle/0003_shared_workspaces.sql"),
+  ]);
+
+  assert.match(page, /GUEST_WORKSPACE_KEY/);
+  assert.match(page, /localStorage/);
+  assert.match(page, /工作区发生冲突/);
+  assert.match(page, /使用云端最新版本/);
+  assert.match(page, /用我的版本覆盖/);
+  assert.match(page, /真实成员/);
+  assert.match(page, /导入 JSON/);
+  assert.match(workspaceRoute, /activeWorkspace\.role === "viewer"/);
+  assert.match(workspacesRoute, /createProductWorkspace/);
+  assert.match(membersRoute, /仅工作区所有者/);
+  assert.match(workspaceDb, /workspace_memberships/);
+  assert.match(workspaceDb, /assigned/);
+  assert.match(migration, /CREATE TABLE `product_workspaces`/);
+  assert.match(migration, /CREATE TABLE `workspace_memberships`/);
 });
 
 test("removes the starter preview and uses product metadata", async () => {
@@ -100,4 +189,24 @@ test("removes the starter preview and uses product metadata", async () => {
   assert.doesNotMatch(layout, /Starter Project|codex-preview/);
   assert.doesNotMatch(page, /SkeletonPreview/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+});
+
+test("uses the WenXiBuddy thin-glass visual system", async () => {
+  const [page, styles] = await Promise.all([
+    read("../app/page.tsx"),
+    read("../app/globals.css"),
+  ]);
+
+  assert.match(styles, /WenXiBuddy ultra-thin white-light glass system/);
+  assert.match(styles, /--bg: #020304/);
+  assert.match(styles, /--green: #17d97a/);
+  assert.match(styles, /backdrop-filter: blur\(22px\)/);
+  assert.match(styles, /Taste audit refinement · focused enterprise workspace/);
+  assert.match(styles, /:root\[data-theme="light"\][\s\S]*color-scheme: light/);
+  assert.match(styles, /grid-template-columns: repeat\(var\(--tick-count\),minmax\(0,1fr\)\)/);
+  assert.match(styles, /@media \(prefers-reduced-transparency: reduce\)/);
+  assert.match(styles, /prefers-reduced-motion/);
+  assert.match(page, /function Icon/);
+  assert.match(page, /strokeWidth="1\.65"/);
+  assert.doesNotMatch(page, /🗑/);
 });

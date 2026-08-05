@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
+  createEmptyWorkspace,
   defaultWorkspace,
   type CalendarEvent,
   type Doc,
@@ -13,26 +14,53 @@ import {
   type TaskStatus,
   type WorkspaceState,
 } from "../lib/workspace-data";
+import { validateWorkspace } from "../lib/workspace-validation";
 
 const navItems = [
-  ["⌘", "项目任务管理"],
-  ["◫", "项目总览"],
-  ["▱", "文件归档"],
-  ["▣", "日程管理"],
-  ["♧", "团队协作"],
-  ["⌁", "智能分析"],
-  ["◇", "知识库"],
-  ["⚙", "设置中心"],
+  ["tasks", "项目任务管理"],
+  ["grid", "项目总览"],
+  ["folder", "文件归档"],
+  ["calendar", "日程管理"],
+  ["users", "团队协作"],
+  ["chart", "智能分析"],
+  ["book", "知识库"],
+  ["settings", "设置中心"],
 ] as const;
 
 const statusInfo: Record<TaskStatus, { label: string; color: string }> = {
-  todo: { label: "待办", color: "#8f9792" },
-  review: { label: "需求评审", color: "#4ba6ff" },
-  design: { label: "产品设计", color: "#a96ef2" },
-  develop: { label: "开发实现", color: "#28d979" },
-  test: { label: "测试验证", color: "#f2a83b" },
-  done: { label: "已完成", color: "#4eae7b" },
+  todo: { label: "待办", color: "#8C9490" },
+  review: { label: "需求评审", color: "#62AFFF" },
+  design: { label: "产品设计", color: "#C8CFCC" },
+  develop: { label: "开发实现", color: "#A8B0AC" },
+  test: { label: "测试验证", color: "#F2A72D" },
+  done: { label: "已完成", color: "#17D97A" },
 };
+
+type IconName = "tasks" | "grid" | "folder" | "calendar" | "users" | "chart" | "book" | "settings" | "search" | "bell" | "plus" | "check" | "close" | "more" | "edit" | "trash" | "arrow-right" | "sparkles";
+
+function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+  const paths: Record<IconName, React.ReactNode> = {
+    tasks: <><rect x="5" y="4" width="14" height="16" rx="2" /><path d="M9 4.5h6M8.5 9h7M8.5 13h5M8.5 17h6" /></>,
+    grid: <><rect x="4" y="4" width="6" height="6" rx="1.5" /><rect x="14" y="4" width="6" height="6" rx="1.5" /><rect x="4" y="14" width="6" height="6" rx="1.5" /><rect x="14" y="14" width="6" height="6" rx="1.5" /></>,
+    folder: <path d="M3.5 7.5h6l1.8-2h9.2v12.8a1.7 1.7 0 0 1-1.7 1.7H5.2a1.7 1.7 0 0 1-1.7-1.7V7.5Z" />,
+    calendar: <><rect x="3.5" y="5" width="17" height="15" rx="2" /><path d="M8 3.5v3M16 3.5v3M3.5 9h17M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01" /></>,
+    users: <><path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20" /><circle cx="9.5" cy="7.5" r="3.5" /><path d="M16 5.2a3.4 3.4 0 0 1 0 6.6M21 20v-1.5a4 4 0 0 0-3-3.8" /></>,
+    chart: <><path d="M4 19.5V13h4v6.5M10 19.5V8h4v11.5M16 19.5V4h4v15.5M3 20h18" /></>,
+    book: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v17H6.5A2.5 2.5 0 0 0 4 22V5.5Z" /><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v17h4.5A2.5 2.5 0 0 1 20 22V5.5Z" /></>,
+    settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" /></>,
+    search: <><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></>,
+    bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></>,
+    plus: <path d="M12 5v14M5 12h14" />,
+    check: <path d="m5 12 4.2 4.2L19 6.5" />,
+    close: <path d="m6 6 12 12M18 6 6 18" />,
+    more: <><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" /></>,
+    edit: <><path d="m14 5 5 5L9 20H4v-5L14 5Z" /><path d="m12 7 5 5" /></>,
+    trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></>,
+    "arrow-right": <><path d="M5 12h14M14 7l5 5-5 5" /></>,
+    sparkles: <><path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3Z" /><path d="m18 14 .7 2.3L21 17l-2.3.7L18 20l-.7-2.3L15 17l2.3-.7L18 14Z" /></>,
+  };
+  return <svg className="ui-icon" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
+}
 
 const statusOrder = Object.keys(statusInfo) as TaskStatus[];
 const priorityLabel: Record<Priority, string> = { high: "高", medium: "中", low: "低" };
@@ -90,6 +118,23 @@ type WikiCatalog = {
     status: string;
   }>;
 };
+
+type AuthUser = {
+  id: string;
+  email: string;
+  displayName: string;
+};
+
+type ProductWorkspace = {
+  id: string;
+  name: string;
+  role: "owner" | "editor" | "viewer";
+  memberCount: number;
+};
+
+type ProductMember = AuthUser & { role: ProductWorkspace["role"] };
+
+const GUEST_WORKSPACE_KEY = "kaiarmy_guest_workspace_v1";
 
 function uid(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -195,6 +240,12 @@ function taskKnowledgeContext(task: Task, workspace: WorkspaceState) {
 }
 
 export default function Home() {
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authState, setAuthState] = useState<"loading" | "guest" | "authenticated">("loading");
+  const [authOpen, setAuthOpen] = useState(false);
+  const [workspaces, setWorkspaces] = useState<ProductWorkspace[]>([]);
+  const [activeWorkspace, setActiveWorkspace] = useState<ProductWorkspace | null>(null);
+  const [syncConflict, setSyncConflict] = useState<{ workspace: WorkspaceState; currentVersion: number } | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceState>(defaultWorkspace);
   const [activeModule, setActiveModule] = useState("项目任务管理");
   const [selectedTaskId, setSelectedTaskId] = useState(defaultWorkspace.tasks[0].id);
@@ -204,45 +255,132 @@ export default function Home() {
   const [fileModal, setFileModal] = useState<{ docId: string; fileId: string } | null>(null);
   const [toast, setToast] = useState("");
   const [hydrated, setHydrated] = useState(false);
-  const [syncState, setSyncState] = useState<"loading" | "saved" | "saving" | "error">("loading");
+  const [syncState, setSyncState] = useState<"loading" | "saved" | "saving" | "error" | "guest">("loading");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const workspaceVersion = useRef(1);
+  const saveInFlight = useRef(false);
+  const pendingWorkspace = useRef<WorkspaceState | null>(null);
+  const hydratedWorkspace = useRef<WorkspaceState | null>(null);
+
+  const announce = useCallback((message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 2400);
+  }, []);
+
+  const persistWorkspace = useCallback(async () => {
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
+    try {
+      while (pendingWorkspace.current) {
+        const snapshot = pendingWorkspace.current;
+        pendingWorkspace.current = null;
+        setSyncState("saving");
+        const response = await fetch("/api/workspace", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workspace: snapshot, version: workspaceVersion.current }),
+        });
+        const result = await response.json() as { version?: number; currentVersion?: number; workspaceName?: string; error?: string };
+        if (response.status === 401) {
+          setAuthUser(null);
+          setAuthState("guest");
+          setSyncState("guest");
+          pendingWorkspace.current = null;
+          break;
+        }
+        if (response.status === 409) {
+          pendingWorkspace.current = null;
+          setSyncState("error");
+          if (Number.isInteger(result.currentVersion)) setSyncConflict({ workspace: snapshot, currentVersion: result.currentVersion! });
+          announce("检测到其他成员更新，请选择保留版本");
+          break;
+        }
+        if (!response.ok || !Number.isInteger(result.version)) throw new Error(result.error || "保存失败");
+        workspaceVersion.current = result.version!;
+        if (result.workspaceName) {
+          setActiveWorkspace((current) => current ? { ...current, name: result.workspaceName! } : current);
+          setWorkspaces((current) => current.map((item) => item.id === activeWorkspace?.id ? { ...item, name: result.workspaceName! } : item));
+        }
+        setSyncState("saved");
+      }
+    } catch {
+      setSyncState("error");
+    } finally {
+      saveInFlight.current = false;
+    }
+  }, [activeWorkspace?.id, announce]);
 
   useEffect(() => {
     fetch("/api/workspace")
       .then(async (response) => {
+        if (response.status === 401) {
+          try {
+            const local = window.localStorage.getItem(GUEST_WORKSPACE_KEY);
+            if (local) {
+              const parsed = JSON.parse(local) as unknown;
+              if (validateWorkspace(parsed)) setWorkspace(parsed);
+            }
+          } catch {
+            window.localStorage.removeItem(GUEST_WORKSPACE_KEY);
+          }
+          setAuthState("guest");
+          setSyncState("guest");
+          return null;
+        }
         if (!response.ok) throw new Error("读取失败");
-        return response.json() as Promise<{ workspace: WorkspaceState }>;
+        return response.json() as Promise<{ workspace: WorkspaceState; version: number; user: AuthUser; activeWorkspace: ProductWorkspace }>;
       })
-      .then(({ workspace: saved }) => {
+      .then((result) => {
+        if (!result) return;
+        const { workspace: saved, version, user, activeWorkspace: selectedWorkspace } = result;
+        setAuthUser(user);
+        setAuthState("authenticated");
+        setActiveWorkspace(selectedWorkspace);
+        hydratedWorkspace.current = saved;
         setWorkspace(saved);
+        workspaceVersion.current = version;
         setSelectedTaskId(saved.tasks[0]?.id ?? "");
         setSelectedDocId(saved.docs[0]?.id ?? "");
         setSyncState("saved");
+        void fetch("/api/workspaces").then((response) => response.json()).then((data: { workspaces?: ProductWorkspace[] }) => setWorkspaces(data.workspaces ?? []));
       })
-      .catch(() => setSyncState("error"))
+      .catch(() => {
+        setAuthState("guest");
+        setSyncState("guest");
+      })
       .finally(() => setHydrated(true));
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || authState !== "guest") return;
+    try {
+      window.localStorage.setItem(GUEST_WORKSPACE_KEY, JSON.stringify(workspace));
+    } catch {}
+  }, [workspace, hydrated, authState]);
+
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (authState === "authenticated" && (syncState === "saving" || pendingWorkspace.current)) event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [authState, syncState]);
+
+  useEffect(() => {
+    if (!hydrated || authState !== "authenticated") return;
+    if (hydratedWorkspace.current === workspace) {
+      hydratedWorkspace.current = null;
+      return;
+    }
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    setSyncState("saving");
+    pendingWorkspace.current = workspace;
     saveTimer.current = setTimeout(() => {
-      fetch("/api/workspace", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace }),
-      })
-        .then((response) => {
-          if (!response.ok) throw new Error("保存失败");
-          setSyncState("saved");
-        })
-        .catch(() => setSyncState("error"));
+      void persistWorkspace();
     }, 700);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [workspace, hydrated]);
+  }, [workspace, hydrated, authState, persistWorkspace]);
 
   // 应用主题到 <html data-theme>，供 CSS 变量切换
   useEffect(() => {
@@ -255,15 +393,22 @@ export default function Home() {
   }, [activeModule]);
 
   const selectedTask = workspace.tasks.find((task) => task.id === selectedTaskId);
-  const announce = (message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(""), 2400);
+  const readOnly = activeWorkspace?.role === "viewer";
+  const currentMemberId = authUser && workspace.members.some((member) => member.id === authUser.id)
+    ? authUser.id
+    : workspace.members[0]?.id ?? "guest";
+  const patchWorkspace = (patch: Partial<WorkspaceState>) => {
+    if (activeWorkspace?.role === "viewer") {
+      announce("当前工作区为只读权限");
+      return;
+    }
+    setWorkspace((current) => ({ ...current, ...patch }));
   };
-  const patchWorkspace = (patch: Partial<WorkspaceState>) => setWorkspace((current) => ({ ...current, ...patch }));
   const updateTask = (id: string, patch: Partial<Task>) => {
     patchWorkspace({ tasks: workspace.tasks.map((task) => task.id === id ? { ...task, ...patch, updatedAt: new Date().toISOString() } : task) });
   };
   const deleteTask = (id: string) => {
+    if (readOnly) { announce("当前工作区为只读权限"); return; }
     if (!window.confirm("确定删除这个任务？相关评论会一并删除。")) return;
     patchWorkspace({
       tasks: workspace.tasks.filter((task) => task.id !== id),
@@ -284,12 +429,14 @@ export default function Home() {
     });
   };
   const addDocFile = (docId: string, file: DocFile) => {
+    if (readOnly) { announce("当前工作区为只读权限"); return; }
     patchWorkspace({
       docs: workspace.docs.map((doc) => doc.id === docId ? { ...doc, updatedAt: new Date().toISOString(), files: [...(doc.files ?? []), file] } : doc),
     });
     announce("文件已上传");
   };
   const deleteDocFile = (docId: string, fileId: string) => {
+    if (readOnly) { announce("当前工作区为只读权限"); return; }
     patchWorkspace({
       docs: workspace.docs.map((doc) => doc.id === docId ? { ...doc, updatedAt: new Date().toISOString(), files: (doc.files ?? []).filter((file) => file.id !== fileId) } : doc),
     });
@@ -299,6 +446,7 @@ export default function Home() {
   const fileModalFile = fileModalDoc?.files?.find((file) => file.id === fileModal?.fileId);
 
   const contextualAction = () => {
+    if (activeWorkspace?.role === "viewer") { announce("当前工作区为只读权限"); return; }
     const kind = activeModule === "项目总览" ? "project" : activeModule === "文件归档" || activeModule === "知识库" ? "doc" : activeModule === "日程管理" ? "event" : "task";
     setModal({ kind });
   };
@@ -319,23 +467,112 @@ export default function Home() {
     if (item.taskId) setSelectedTaskId(item.taskId);
   };
 
+  const handleAuthenticated = (user: AuthUser) => {
+    setAuthUser(user);
+    setAuthState("authenticated");
+    setAuthOpen(false);
+    setHydrated(false);
+    setSyncState("loading");
+    fetch("/api/workspace")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("读取失败");
+        return response.json() as Promise<{ workspace: WorkspaceState; version: number; activeWorkspace: ProductWorkspace }>;
+      })
+      .then(({ workspace: saved, version, activeWorkspace: selectedWorkspace }) => {
+        setActiveWorkspace(selectedWorkspace);
+        hydratedWorkspace.current = saved;
+        setWorkspace(saved);
+        workspaceVersion.current = version;
+        setSelectedTaskId(saved.tasks[0]?.id ?? "");
+        setSelectedDocId(saved.docs[0]?.id ?? "");
+        setSyncState("saved");
+        setHydrated(true);
+        void fetch("/api/workspaces").then((response) => response.json()).then((data: { workspaces?: ProductWorkspace[] }) => setWorkspaces(data.workspaces ?? []));
+      })
+      .catch(() => setSyncState("error"));
+  };
+
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    pendingWorkspace.current = null;
+    setAuthUser(null);
+    setAuthState("guest");
+    setActiveWorkspace(null);
+    setWorkspaces([]);
+    let guestWorkspace = defaultWorkspace;
+    try {
+      const local = window.localStorage.getItem(GUEST_WORKSPACE_KEY);
+      const parsed = local ? JSON.parse(local) as unknown : null;
+      if (validateWorkspace(parsed)) guestWorkspace = parsed;
+    } catch {}
+    setWorkspace(guestWorkspace);
+    setSelectedTaskId(guestWorkspace.tasks[0]?.id ?? "");
+    setSelectedDocId(guestWorkspace.docs[0]?.id ?? "");
+    setSyncState("guest");
+    setHydrated(true);
+  };
+
+  const switchWorkspace = async (workspaceId: string) => {
+    if (!workspaceId || workspaceId === activeWorkspace?.id) return;
+    if (syncState === "saving" || pendingWorkspace.current) await persistWorkspace();
+    setSyncState("loading");
+    const response = await fetch("/api/workspaces/select", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId }) });
+    if (!response.ok) { setSyncState("error"); announce("切换工作区失败"); return; }
+    const workspaceResponse = await fetch("/api/workspace");
+    const result = await workspaceResponse.json() as { workspace?: WorkspaceState; version?: number; activeWorkspace?: ProductWorkspace; error?: string };
+    if (!workspaceResponse.ok || !result.workspace || !result.activeWorkspace || !Number.isInteger(result.version)) { setSyncState("error"); announce(result.error || "读取工作区失败"); return; }
+    hydratedWorkspace.current = result.workspace;
+    setWorkspace(result.workspace);
+    workspaceVersion.current = result.version!;
+    setActiveWorkspace(result.activeWorkspace);
+    setSelectedTaskId(result.workspace.tasks[0]?.id ?? "");
+    setSelectedDocId(result.workspace.docs[0]?.id ?? "");
+    setSyncState("saved");
+  };
+
+  const reloadCloudWorkspace = async () => {
+    const response = await fetch("/api/workspace");
+    const result = await response.json() as { workspace?: WorkspaceState; version?: number };
+    if (response.ok && result.workspace && Number.isInteger(result.version)) {
+      hydratedWorkspace.current = result.workspace;
+      setWorkspace(result.workspace);
+      workspaceVersion.current = result.version!;
+      setSyncState("saved");
+      setSyncConflict(null);
+    }
+  };
+
+  const overwriteCloudWorkspace = () => {
+    if (!syncConflict) return;
+    workspaceVersion.current = syncConflict.currentVersion;
+    pendingWorkspace.current = syncConflict.workspace;
+    setWorkspace(syncConflict.workspace);
+    setSyncConflict(null);
+    void persistWorkspace();
+  };
+
+  if (authState === "loading") return <AuthLoading />;
+
   return (
     <div className={`app ${workspace.settings.compactMode ? "compact" : ""}`}>
-      <Sidebar active={activeModule} onChange={(module) => { setActiveModule(module); setSearch(""); }} workspace={workspace} />
+      <Sidebar active={activeModule} onChange={(module) => { setActiveModule(module); setSearch(""); }} workspace={workspace} user={authUser} workspaces={workspaces} activeWorkspace={activeWorkspace} onSwitchWorkspace={switchWorkspace} onLogin={() => setAuthOpen(true)} onLogout={logout} />
       <main className="main">
-        <Header activeModule={activeModule} search={search} setSearch={setSearch} syncState={syncState} actionLabel={actionLabel} onAction={contextualAction} notifications={notifications} unreadCount={unreadCount} onOpenNotification={openNotification} />
+        <Header activeModule={activeModule} search={search} setSearch={setSearch} syncState={syncState} actionLabel={actionLabel} onAction={contextualAction} actionDisabled={readOnly} notifications={notifications} unreadCount={unreadCount} onOpenNotification={openNotification} />
         <div className="page">
           {activeModule === "项目任务管理" && (
             <TaskManagement
               workspace={workspace}
               search={search}
               selectedTaskId={selectedTaskId}
+              wikiEnabled={Boolean(authUser)}
+              canEdit={!readOnly}
+              currentMemberId={currentMemberId}
               onSelect={setSelectedTaskId}
               onUpdate={updateTask}
               onDelete={deleteTask}
-              onEdit={(task) => setModal({ kind: "task", task })}
-              onCreate={() => setModal({ kind: "task" })}
-              onCreateKnowledgeTask={(sourceTask, answer) => setModal({
+              onEdit={(task) => readOnly ? announce("当前工作区为只读权限") : setModal({ kind: "task", task })}
+              onCreate={() => readOnly ? announce("当前工作区为只读权限") : setModal({ kind: "task" })}
+              onCreateKnowledgeTask={(sourceTask, answer) => readOnly ? announce("当前工作区为只读权限") : setModal({
                 kind: "task",
                 preset: {
                   title: `${sourceTask.title} · 知识跟进`,
@@ -350,7 +587,7 @@ export default function Home() {
               })}
               onComment={(content) => {
                 if (!selectedTask) return;
-                patchWorkspace({ comments: [...workspace.comments, { id: uid("c"), taskId: selectedTask.id, authorId: "m1", content, createdAt: new Date().toISOString() }] });
+                patchWorkspace({ comments: [...workspace.comments, { id: uid("c"), taskId: selectedTask.id, authorId: currentMemberId, content, createdAt: new Date().toISOString() }] });
                 announce("评论已发布");
               }}
               onLinkDocs={(taskId, docIds) => {
@@ -368,13 +605,13 @@ export default function Home() {
               announce={announce}
             />
           )}
-          {activeModule === "项目总览" && <ProjectOverview workspace={workspace} search={search} onChange={patchWorkspace} onCreate={() => setModal({ kind: "project" })} announce={announce} onOpenFile={(docId, fileId) => setFileModal({ docId, fileId })} onUploadFile={addDocFile} />}
-          {activeModule === "文件归档" && <FileArchive workspace={workspace} search={search} selectedDocId={selectedDocId} onSelect={setSelectedDocId} onChange={patchWorkspace} onCreate={() => setModal({ kind: "doc" })} announce={announce} onOpenFile={(docId, fileId) => setFileModal({ docId, fileId })} onUploadFile={addDocFile} onDeleteFile={deleteDocFile} />}
-          {activeModule === "日程管理" && <CalendarView workspace={workspace} search={search} onChange={patchWorkspace} onCreate={(date) => setModal({ kind: "event", date })} onBatchCreate={() => setModal({ kind: "events-batch" })} announce={announce} />}
+          {activeModule === "项目总览" && <ProjectOverview workspace={workspace} search={search} onChange={patchWorkspace} onCreate={() => readOnly ? announce("当前工作区为只读权限") : setModal({ kind: "project" })} announce={announce} onOpenFile={(docId, fileId) => setFileModal({ docId, fileId })} onUploadFile={addDocFile} />}
+          {activeModule === "文件归档" && <FileArchive workspace={workspace} search={search} selectedDocId={selectedDocId} onSelect={setSelectedDocId} onChange={patchWorkspace} onCreate={() => readOnly ? announce("当前工作区为只读权限") : setModal({ kind: "doc" })} announce={announce} onOpenFile={(docId, fileId) => setFileModal({ docId, fileId })} onUploadFile={addDocFile} onDeleteFile={deleteDocFile} />}
+          {activeModule === "日程管理" && <CalendarView workspace={workspace} search={search} onChange={patchWorkspace} onCreate={(date) => readOnly ? announce("当前工作区为只读权限") : setModal({ kind: "event", date })} onBatchCreate={() => readOnly ? announce("当前工作区为只读权限") : setModal({ kind: "events-batch" })} announce={announce} />}
           {activeModule === "团队协作" && <TeamView workspace={workspace} search={search} onUpdateTask={updateTask} />}
           {activeModule === "智能分析" && <AnalyticsView workspace={workspace} />}
-          {activeModule === "知识库" && <KnowledgeBase workspace={workspace} search={search} selectedDocId={selectedDocId} selectedTaskId={selectedTaskId} onSelect={setSelectedDocId} onChange={patchWorkspace} onCreate={() => setModal({ kind: "doc" })} onAddComment={(taskId, content) => patchWorkspace({ comments: [...workspace.comments, { id: uid("c"), taskId, authorId: "m1", content, createdAt: new Date().toISOString() }] })} onCreateKnowledgeTask={(sourceTask, answer) => setModal({ kind: "task", preset: { title: `${sourceTask.title} · 知识跟进`, description: `基于 KAI 知识助手建议：\n${answer.slice(0, 1200)}`, projectId: sourceTask.projectId, assigneeId: sourceTask.assigneeId, participantIds: sourceTask.participantIds, priority: sourceTask.priority, tags: Array.from(new Set([...sourceTask.tags, "KAI知识"])), docIds: sourceTask.docIds } })} announce={announce} />}
-          {activeModule === "设置中心" && <SettingsView workspace={workspace} onChange={patchWorkspace} announce={announce} />}
+          {activeModule === "知识库" && <KnowledgeBase workspace={workspace} search={search} selectedDocId={selectedDocId} selectedTaskId={selectedTaskId} wikiEnabled={Boolean(authUser)} canEdit={!readOnly} onSelect={setSelectedDocId} onChange={patchWorkspace} onCreate={() => readOnly ? announce("当前工作区为只读权限") : setModal({ kind: "doc" })} onAddComment={(taskId, content) => patchWorkspace({ comments: [...workspace.comments, { id: uid("c"), taskId, authorId: currentMemberId, content, createdAt: new Date().toISOString() }] })} onCreateKnowledgeTask={(sourceTask, answer) => readOnly ? announce("当前工作区为只读权限") : setModal({ kind: "task", preset: { title: `${sourceTask.title} · 知识跟进`, description: `基于 KAI 知识助手建议：\n${answer.slice(0, 1200)}`, projectId: sourceTask.projectId, assigneeId: sourceTask.assigneeId, participantIds: sourceTask.participantIds, priority: sourceTask.priority, tags: Array.from(new Set([...sourceTask.tags, "KAI知识"])), docIds: sourceTask.docIds } })} announce={announce} />}
+          {activeModule === "设置中心" && <SettingsView key={`${authUser?.id ?? "guest"}-${activeWorkspace?.id ?? "local"}`} workspace={workspace} onChange={patchWorkspace} announce={announce} user={authUser} activeWorkspace={activeWorkspace} workspaces={workspaces} onWorkspacesChange={setWorkspaces} onSwitchWorkspace={switchWorkspace} onReloadWorkspace={reloadCloudWorkspace} onUserChange={setAuthUser} />}
         </div>
       </main>
       {modal?.kind === "task" && <TaskFormModal workspace={workspace} task={modal.task} preset={modal.preset} onClose={() => setModal(null)} onSave={(task) => {
@@ -392,30 +629,91 @@ export default function Home() {
       {modal?.kind === "doc" && <DocFormModal workspace={workspace} onClose={() => setModal(null)} onSave={(doc) => { patchWorkspace({ docs: [...workspace.docs, doc] }); setSelectedDocId(doc.id); setModal(null); announce("文档已创建"); }} />}
       {modal?.kind === "event" && <EventFormModal workspace={workspace} presetDate={modal.date} onClose={() => setModal(null)} onSave={(event) => { patchWorkspace({ events: [...workspace.events, event] }); setModal(null); announce("日程已创建"); }} />}
       {modal?.kind === "events-batch" && <BatchEventModal workspace={workspace} onClose={() => setModal(null)} onSave={(events) => { patchWorkspace({ events: [...workspace.events, ...events] }); setModal(null); announce(`已批量添加 ${events.length} 条日程`); }} />}
-      {fileModal && fileModalDoc && fileModalFile && <FileViewerModal docName={fileModalDoc.name} file={fileModalFile} onClose={() => setFileModal(null)} onSave={(patch) => { updateDocFile(fileModal.docId, fileModal.fileId, patch); announce("文件已保存"); }} onReplace={(patch) => updateDocFile(fileModal.docId, fileModal.fileId, patch)} onOversize={() => announce(`文件超过 ${Math.round(MAX_FILE_BYTES / 1000)}KB 上限`)} />}
-      {toast && <div className="toast">✓ {toast}</div>}
+      {fileModal && fileModalDoc && fileModalFile && <FileViewerModal docName={fileModalDoc.name} file={fileModalFile} readOnly={readOnly} onClose={() => setFileModal(null)} onSave={(patch) => { updateDocFile(fileModal.docId, fileModal.fileId, patch); announce("文件已保存"); }} onReplace={(patch) => updateDocFile(fileModal.docId, fileModal.fileId, patch)} onOversize={() => announce(`文件超过 ${Math.round(MAX_FILE_BYTES / 1000)}KB 上限`)} />}
+      {authOpen && <AuthScreen onAuthenticated={handleAuthenticated} onClose={() => setAuthOpen(false)} />}
+      {syncConflict && <div className="modal-backdrop"><section className="sync-conflict panel"><header><div><h2>工作区发生冲突</h2><p>其他成员已经保存了更新。请选择要保留的数据版本。</p></div></header><div><button onClick={() => void reloadCloudWorkspace()}>使用云端最新版本</button><button className="primary" onClick={overwriteCloudWorkspace}>用我的版本覆盖</button></div></section></div>}
+      {toast && <div className="toast"><Icon name="check" size={16} />{toast}</div>}
     </div>
   );
 }
 
-function Sidebar({ active, onChange, workspace }: { active: string; onChange: (module: string) => void; workspace: WorkspaceState }) {
+function Sidebar({ active, onChange, workspace, user, workspaces, activeWorkspace, onSwitchWorkspace, onLogin, onLogout }: { active: string; onChange: (module: string) => void; workspace: WorkspaceState; user: AuthUser | null; workspaces: ProductWorkspace[]; activeWorkspace: ProductWorkspace | null; onSwitchWorkspace: (id: string) => void; onLogin: () => void; onLogout: () => void }) {
   return (
     <aside className="sidebar">
-      <button className="brand" onClick={() => onChange("项目任务管理")}><span>K</span><div><strong>KaiArmy</strong><small>PROJECT INTELLIGENCE</small></div></button>
+      <button className="brand" onClick={() => onChange("项目任务管理")}><span>KA</span><div><strong>KaiArmy</strong><small>PROJECT INTELLIGENCE</small></div></button>
       <nav>
         <span className="nav-label">工作台</span>
-        {navItems.slice(0, 6).map(([icon, label]) => <button key={label} className={active === label ? "active" : ""} onClick={() => onChange(label)}><i>{icon}</i><span>{label}</span>{label === "项目任务管理" && <b>{workspace.tasks.filter((task) => task.status !== "done").length}</b>}</button>)}
+        {navItems.slice(0, 6).map(([icon, label]) => <button key={label} className={active === label ? "active" : ""} onClick={() => onChange(label)}><i><Icon name={icon} /></i><span>{label}</span>{label === "项目任务管理" && <b>{workspace.tasks.filter((task) => task.status !== "done").length}</b>}</button>)}
         <span className="nav-label secondary">资源与配置</span>
-        {navItems.slice(6).map(([icon, label]) => <button key={label} className={active === label ? "active" : ""} onClick={() => onChange(label)}><i>{icon}</i><span>{label}</span></button>)}
+        {navItems.slice(6).map(([icon, label]) => <button key={label} className={active === label ? "active" : ""} onClick={() => onChange(label)}><i><Icon name={icon} /></i><span>{label}</span></button>)}
       </nav>
-      <div className="workspace-card"><span>当前工作区</span><strong>{workspace.settings.workspaceName}</strong><small>{workspace.members.filter((member) => member.online).length} 位成员在线</small></div>
-      <div className="user-card"><Avatar label="BR" /><div><strong>{workspace.settings.displayName}</strong><small>产品经理</small></div><i></i></div>
+      <div className="workspace-card"><span>当前工作区</span>{user && workspaces.length > 1 ? <select aria-label="切换工作区" value={activeWorkspace?.id ?? ""} onChange={(event) => void onSwitchWorkspace(event.target.value)}>{workspaces.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select> : <strong>{workspace.settings.workspaceName}</strong>}<small>{user ? `${activeWorkspace?.memberCount ?? 1} 位真实成员 · ${activeWorkspace?.role === "owner" ? "所有者" : activeWorkspace?.role === "editor" ? "可编辑" : "只读"}` : "本机数据 · 登录后云端同步"}</small></div>
+      {user ? (
+        <div className="user-card"><Avatar label={initials(user.displayName)} /><div><strong>{user.displayName}</strong><small>{user.email}</small></div><button aria-label="退出登录" title="退出登录" onClick={onLogout}>↗</button></div>
+      ) : (
+        <button className="user-card guest-user-card" onClick={onLogin}><Avatar label="访" /><div><strong>访客模式</strong><small>登录后云端同步</small></div><span>登录</span></button>
+      )}
     </aside>
   );
 }
 
-function Header({ activeModule, search, setSearch, syncState, actionLabel, onAction, notifications, unreadCount, onOpenNotification }: { activeModule: string; search: string; setSearch: (value: string) => void; syncState: "loading" | "saved" | "saving" | "error"; actionLabel: string; onAction: () => void; notifications: Notification[]; unreadCount: number; onOpenNotification: (item: Notification) => void }) {
-  const syncText = { loading: "加载中", saved: "已自动保存", saving: "正在保存", error: "保存失败" }[syncState];
+function initials(value: string) {
+  const compact = value.trim().replace(/\s+/g, " ");
+  if (!compact) return "KA";
+  const parts = compact.split(" ");
+  return (parts.length > 1 ? `${parts[0][0]}${parts.at(-1)?.[0] ?? ""}` : compact.slice(0, 2)).toUpperCase();
+}
+
+function AuthLoading() {
+  return <main className="auth-shell"><div className="auth-loader"><span>KA</span><p>正在进入工作区…</p></div></main>;
+}
+
+function AuthScreen({ onAuthenticated, onClose }: { onAuthenticated: (user: AuthUser) => void; onClose: () => void }) {
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/auth/${mode}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, displayName }),
+      });
+      const result = await response.json() as { user?: AuthUser; error?: string };
+      if (!response.ok || !result.user) throw new Error(result.error || "操作失败");
+      onAuthenticated(result.user);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "操作失败");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="auth-modal-backdrop" onMouseDown={onClose}>
+      <form className="auth-card auth-dialog" onMouseDown={(event) => event.stopPropagation()} onSubmit={submit}>
+          <header><div><small>{mode === "login" ? "WELCOME BACK" : "CREATE WORKSPACE"}</small><h2>{mode === "login" ? "登录 KaiArmy" : "创建你的账号"}</h2><p>{mode === "login" ? "登录后加载你的云端工作区。" : "注册后获得独立的云端工作区。"}</p></div><button type="button" className="auth-close" aria-label="关闭" onClick={onClose}><Icon name="close" size={18} /></button></header>
+          <div className="auth-tabs"><button type="button" className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setError(""); }}>登录</button><button type="button" className={mode === "register" ? "active" : ""} onClick={() => { setMode("register"); setError(""); }}>注册</button></div>
+          {mode === "register" && <label>显示名称<input autoFocus value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" minLength={2} maxLength={80} placeholder="你的姓名" required /></label>}
+          <label>邮箱<input autoFocus={mode === "login"} type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" maxLength={320} placeholder="name@company.com" required /></label>
+          <label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "register" ? 10 : undefined} maxLength={128} placeholder={mode === "register" ? "至少 10 个字符" : "输入密码"} required /></label>
+          {error && <p className="auth-error">{error}</p>}
+          <button className="auth-submit" disabled={submitting}>{submitting ? "请稍候…" : mode === "login" ? "进入工作区" : "创建账号"}<span>→</span></button>
+          <footer>当前访客修改仅保留在本次页面 · 登录后切换到云端数据</footer>
+      </form>
+    </div>
+  );
+}
+
+function Header({ activeModule, search, setSearch, syncState, actionLabel, onAction, actionDisabled = false, notifications, unreadCount, onOpenNotification }: { activeModule: string; search: string; setSearch: (value: string) => void; syncState: "loading" | "saved" | "saving" | "error" | "guest"; actionLabel: string; onAction: () => void; actionDisabled?: boolean; notifications: Notification[]; unreadCount: number; onOpenNotification: (item: Notification) => void }) {
+  const syncText = { loading: "加载中", saved: "已自动保存", saving: "正在保存", error: "保存失败", guest: "访客预览" }[syncState];
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -429,10 +727,10 @@ function Header({ activeModule, search, setSearch, syncState, actionLabel, onAct
   return (
     <header className="header">
       <div className="heading"><h1>{activeModule}</h1><p>{moduleDescriptions[activeModule]}</p></div>
-      <label className="search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`搜索${activeModule}…`} /><kbd>⌘ K</kbd></label>
+      <label className="search"><span><Icon name="search" size={18} /></span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`搜索${activeModule}…`} /><kbd>⌘ K</kbd></label>
       <div className="header-actions"><span className={`sync ${syncState}`}><i></i>{syncText}</span>
         <div className="menu-anchor" ref={notifRef}>
-          <button className="icon-button" aria-label="通知" aria-expanded={notifOpen} onClick={() => setNotifOpen((value) => !value)}>♢{unreadCount > 0 && <b>{unreadCount > 9 ? "9+" : unreadCount}</b>}</button>
+          <button className={`icon-button notification-button ${notifOpen ? "open" : ""}`} aria-label="通知" aria-expanded={notifOpen} onClick={() => setNotifOpen((value) => !value)}><Icon name="bell" size={19} />{unreadCount > 0 && <span className="notification-count">{unreadCount > 9 ? "9+" : unreadCount}</span>}</button>
           {notifOpen && (
             <div className="notif-panel" role="menu">
               <header><strong>通知</strong><span>{notifications.length} 条</span></header>
@@ -447,14 +745,15 @@ function Header({ activeModule, search, setSearch, syncState, actionLabel, onAct
             </div>
           )}
         </div>
-        <button className="primary" onClick={onAction}>＋ {actionLabel}</button>
+        <button className="primary" disabled={actionDisabled} title={actionDisabled ? "当前工作区为只读权限" : undefined} onClick={onAction}><Icon name="plus" size={16} />{actionLabel}</button>
       </div>
     </header>
   );
 }
 
-function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate, onDelete, onEdit, onCreate, onCreateKnowledgeTask, onComment, onLinkDocs, announce }: {
+function TaskManagement({ workspace, search, selectedTaskId, wikiEnabled, canEdit, currentMemberId, onSelect, onUpdate, onDelete, onEdit, onCreate, onCreateKnowledgeTask, onComment, onLinkDocs, announce }: {
   workspace: WorkspaceState; search: string; selectedTaskId: string; onSelect: (id: string) => void;
+  wikiEnabled: boolean; canEdit: boolean; currentMemberId: string;
   onUpdate: (id: string, patch: Partial<Task>) => void; onDelete: (id: string) => void;
   onEdit: (task: Task) => void; onCreate: () => void; onCreateKnowledgeTask: (sourceTask: Task, answer: string) => void; onComment: (content: string) => void;
   onLinkDocs: (taskId: string, docIds: string[]) => void; announce: (message: string) => void;
@@ -468,7 +767,7 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
   const selected = workspace.tasks.find((task) => task.id === selectedTaskId);
   const filtered = workspace.tasks.filter((task) => {
     const query = `${task.id}${task.title}${task.tags.join("")}`.toLowerCase();
-    const matchesScope = scope === "all" || (scope === "mine" ? task.assigneeId === "m1" : task.participantIds.includes("m1"));
+    const matchesScope = scope === "all" || (scope === "mine" ? task.assigneeId === currentMemberId : task.participantIds.includes(currentMemberId));
     return query.includes(search.toLowerCase()) && matchesScope && (projectFilter === "all" || task.projectId === projectFilter) && (priorityFilter === "all" || task.priority === priorityFilter);
   });
   const overdue = workspace.tasks.filter(isOverdue).length;
@@ -480,7 +779,7 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
   };
 
   return (
-    <div className={`task-layout ${view === "dashboard" ? "dashboard-mode" : ""}`}>
+    <div className={`task-layout ${view === "dashboard" ? "dashboard-mode" : ""} ${canEdit ? "" : "read-only"}`}>
       <section className="task-content">
         <div className="metric-grid">
           <Metric label="今日待办" value={dueToday} detail="需要关注" tone="blue" />
@@ -496,14 +795,15 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
         </div>
         {view === "dashboard" && selected ? (
           <div className="command-grid">
-            <CompactTaskPanel tasks={filtered} selectedTaskId={selectedTaskId} onSelect={onSelect} onCreate={onCreate} />
+            <CompactTaskPanel tasks={filtered} selectedTaskId={selectedTaskId} onSelect={onSelect} onCreate={onCreate} canEdit={canEdit} />
             <CommandFileDeck
               docs={workspace.docs}
               selectedIds={selected.docIds}
               project={workspace.projects.find((project) => project.id === selected.projectId)}
               tasks={workspace.tasks}
-              onToggle={toggleLinkedDoc}
-              onManage={() => setShowDocPicker(true)}
+              onToggle={canEdit ? toggleLinkedDoc : () => undefined}
+              onManage={canEdit ? () => setShowDocPicker(true) : () => undefined}
+              canEdit={canEdit}
             />
             <CommandInspector
               task={selected}
@@ -514,6 +814,8 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
               onManageFiles={() => setShowDocPicker(true)}
               onAddComment={onComment}
               onCreateTask={(answer) => onCreateKnowledgeTask(selected, answer)}
+              wikiEnabled={wikiEnabled}
+              canEdit={canEdit}
               announce={announce}
             />
             <ProjectTimeline tasks={filtered} selectedTaskId={selectedTaskId} onSelect={onSelect} />
@@ -523,8 +825,8 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
             {statusOrder.map((status) => {
               const tasks = filtered.filter((task) => task.status === status);
               return (
-                <section className="kanban-column panel" key={status} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const id = event.dataTransfer.getData("text/plain"); if (id) onUpdate(id, { status }); }}>
-                  <header><span style={{ background: statusInfo[status].color }}></span><strong>{statusInfo[status].label}</strong><b>{tasks.length}</b><button onClick={onCreate}>＋</button></header>
+                <section className="kanban-column panel" key={status} onDragOver={(event) => { if (canEdit) event.preventDefault(); }} onDrop={(event) => { if (!canEdit) return; const id = event.dataTransfer.getData("text/plain"); if (id) onUpdate(id, { status }); }}>
+                  <header><span style={{ background: statusInfo[status].color }}></span><strong>{statusInfo[status].label}</strong><b>{tasks.length}</b><button disabled={!canEdit} onClick={onCreate}>＋</button></header>
                   <div className="column-body">
                     {tasks.map((task) => <TaskCard key={task.id} task={task} workspace={workspace} selected={selectedTaskId === task.id} onClick={() => onSelect(task.id)} />)}
                     {!tasks.length && <div className="column-empty">拖动任务到这里</div>}
@@ -546,11 +848,11 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
           <h2>{selected.title}</h2>
           <p>{selected.description}</p>
           <div className="field-grid">
-            <label>所属项目<select value={selected.projectId} onChange={(event) => onUpdate(selected.id, { projectId: event.target.value })}>{workspace.projects.filter((project) => !project.archived).map((project) => <option value={project.id} key={project.id}>{project.name}</option>)}</select></label>
-            <label>当前状态<select value={selected.status} onChange={(event) => onUpdate(selected.id, { status: event.target.value as TaskStatus })}>{statusOrder.map((status) => <option value={status} key={status}>{statusInfo[status].label}</option>)}</select></label>
-            <label>负责人<select value={selected.assigneeId} onChange={(event) => onUpdate(selected.id, { assigneeId: event.target.value })}>{workspace.members.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></label>
-            <label>优先级<select value={selected.priority} onChange={(event) => onUpdate(selected.id, { priority: event.target.value as Priority })}><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></label>
-            <label className="full">截止时间<input type="datetime-local" value={selected.dueAt.slice(0, 16)} onChange={(event) => onUpdate(selected.id, { dueAt: new Date(event.target.value).toISOString() })} /></label>
+            <label>所属项目<select disabled={!canEdit} value={selected.projectId} onChange={(event) => onUpdate(selected.id, { projectId: event.target.value })}>{workspace.projects.filter((project) => !project.archived).map((project) => <option value={project.id} key={project.id}>{project.name}</option>)}</select></label>
+            <label>当前状态<select disabled={!canEdit} value={selected.status} onChange={(event) => onUpdate(selected.id, { status: event.target.value as TaskStatus })}>{statusOrder.map((status) => <option value={status} key={status}>{statusInfo[status].label}</option>)}</select></label>
+            <label>负责人<select disabled={!canEdit} value={selected.assigneeId} onChange={(event) => onUpdate(selected.id, { assigneeId: event.target.value })}>{workspace.members.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></label>
+            <label>优先级<select disabled={!canEdit} value={selected.priority} onChange={(event) => onUpdate(selected.id, { priority: event.target.value as Priority })}><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></label>
+            <label className="full">截止时间<input disabled={!canEdit} type="datetime-local" value={selected.dueAt.slice(0, 16)} onChange={(event) => onUpdate(selected.id, { dueAt: new Date(event.target.value).toISOString() })} /></label>
           </div>
           <section className="linked-docs"><h3>关联文件 <span>{selected.docIds.length}</span><button onClick={() => setShowDocPicker(true)}>管理文件 →</button></h3>{workspace.docs.filter((doc) => selected.docIds.includes(doc.id)).map((doc) => <article key={doc.id}><i>▤</i><div><strong>{doc.name}</strong><small>{doc.type.toUpperCase()} · v{doc.version}</small></div><button aria-label={`取消关联 ${doc.name}`} onClick={() => onLinkDocs(selected.id, selected.docIds.filter((id) => id !== doc.id))}>×</button></article>)}{!selected.docIds.length && <button className="inline-empty file-empty" onClick={() => setShowDocPicker(true)}>＋ 从文件归档中选取</button>}</section>
           <section className="ai-note"><span>✦ 智能建议</span><strong>{isOverdue(selected) ? "任务已经逾期，建议重新排期或转交。" : selected.priority === "high" ? "这是高优先级任务，建议拆分验收节点。" : "当前任务状态正常。"}</strong></section>
@@ -561,9 +863,11 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
             suggestedQuestions={["这个任务需要遵循哪些规则？", "帮我检查验收条件是否完整", "有哪些相关风险和遗漏？"]}
             onAddComment={(answer) => { onComment(`KAI 知识助手：\n${answer}`); announce("知识回答已引用到评论"); }}
             onCreateTask={(answer) => onCreateKnowledgeTask(selected, answer)}
+            enabled={wikiEnabled}
+            canWrite={canEdit}
           />
-          <section className="comments"><h3>协作评论 <span>{workspace.comments.filter((item) => item.taskId === selected.id).length}</span></h3><div className="comment-list">{workspace.comments.filter((item) => item.taskId === selected.id).map((item) => { const author = workspace.members.find((member) => member.id === item.authorId); return <article key={item.id}><Avatar label={author?.avatar ?? "?"} /><div><strong>{author?.name}</strong><p>{item.content}</p><small>{formatDateTime(item.createdAt)}</small></div></article>; })}</div><form onSubmit={(event) => { event.preventDefault(); if (!comment.trim()) return; onComment(comment.trim()); setComment(""); }}><input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="写下评论，支持 @成员…" /><button disabled={!comment.trim()}>发送</button></form></section>
-          <footer><button className="danger-button" onClick={() => onDelete(selected.id)}>删除</button><button onClick={() => onEdit(selected)}>编辑详情</button><button className="primary" onClick={() => onUpdate(selected.id, { status: selected.status === "done" ? "develop" : "done" })}>{selected.status === "done" ? "重新打开" : "✓ 完成任务"}</button></footer>
+          <section className="comments"><h3>协作评论 <span>{workspace.comments.filter((item) => item.taskId === selected.id).length}</span></h3><div className="comment-list">{workspace.comments.filter((item) => item.taskId === selected.id).map((item) => { const author = workspace.members.find((member) => member.id === item.authorId); return <article key={item.id}><Avatar label={author?.avatar ?? "?"} /><div><strong>{author?.name}</strong><p>{item.content}</p><small>{formatDateTime(item.createdAt)}</small></div></article>; })}</div>{canEdit && <form onSubmit={(event) => { event.preventDefault(); if (!comment.trim()) return; onComment(comment.trim()); setComment(""); }}><input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="写下评论，支持 @成员…" /><button disabled={!comment.trim()}>发送</button></form>}</section>
+          {canEdit && <footer><button className="danger-button" onClick={() => onDelete(selected.id)}>删除</button><button onClick={() => onEdit(selected)}>编辑详情</button><button className="primary" onClick={() => onUpdate(selected.id, { status: selected.status === "done" ? "develop" : "done" })}>{selected.status === "done" ? "重新打开" : "✓ 完成任务"}</button></footer>}
           {showDocPicker && <SpatialFilePicker docs={workspace.docs} selectedIds={selected.docIds} taskTitle={selected.title} onClose={() => setShowDocPicker(false)} onSave={(docIds) => { onLinkDocs(selected.id, docIds); setShowDocPicker(false); }} />}
         </aside>
       ) : view !== "dashboard" ? <aside className="task-drawer panel empty-state"><span>◇</span><h3>选择一个任务</h3><p>查看详情、评论和关联文档</p></aside> : null}
@@ -572,25 +876,25 @@ function TaskManagement({ workspace, search, selectedTaskId, onSelect, onUpdate,
   );
 }
 
-function CompactTaskPanel({ tasks, selectedTaskId, onSelect, onCreate }: { tasks: Task[]; selectedTaskId: string; onSelect: (id: string) => void; onCreate: () => void }) {
+function CompactTaskPanel({ tasks, selectedTaskId, onSelect, onCreate, canEdit }: { tasks: Task[]; selectedTaskId: string; onSelect: (id: string) => void; onCreate: () => void; canEdit: boolean }) {
   const groups = [
-    { key: "review", label: "需求评审", statuses: ["review"] as TaskStatus[], color: "#35d87e" },
-    { key: "design", label: "产品设计", statuses: ["design"] as TaskStatus[], color: "#4ba6ff" },
-    { key: "build", label: "开发实现", statuses: ["todo","develop","test"] as TaskStatus[], color: "#a96ef2" },
-    { key: "done", label: "已完成", statuses: ["done"] as TaskStatus[], color: "#8f9792" },
+    { key: "review", label: "需求评审", statuses: ["review"] as TaskStatus[] },
+    { key: "design", label: "产品设计", statuses: ["design"] as TaskStatus[] },
+    { key: "build", label: "开发实现", statuses: ["todo","develop","test"] as TaskStatus[] },
+    { key: "done", label: "已完成", statuses: ["done"] as TaskStatus[] },
   ];
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const toggle = (key: string) => setCollapsed((current) => ({ ...current, [key]: !current[key] }));
   return (
     <section className="compact-task-panel panel">
-      <header><div><span>任务队列</span><strong>按阶段推进</strong></div><button onClick={onCreate}>＋</button></header>
+      <header><div><span>任务队列</span><strong>按阶段推进</strong></div><button disabled={!canEdit} onClick={onCreate}>＋</button></header>
       <div className="compact-task-scroll">
         {groups.map((group) => {
           const groupTasks = tasks.filter((task) => group.statuses.includes(task.status));
           const isCollapsed = collapsed[group.key];
           return (
             <section className={`compact-task-group ${isCollapsed ? "collapsed" : ""}`} key={group.key}>
-              <header onClick={() => toggle(group.key)} role="button" aria-expanded={!isCollapsed}><i style={{ background: group.color }}></i><strong>{group.label}</strong><span>{groupTasks.length}</span><b className={isCollapsed ? "flip" : ""}>⌄</b></header>
+              <header onClick={() => toggle(group.key)} role="button" aria-expanded={!isCollapsed}><i></i><strong>{group.label}</strong><span>{groupTasks.length}</span><b className={isCollapsed ? "flip" : ""}>⌄</b></header>
               {!isCollapsed && groupTasks.slice(0, 4).map((task) => (
                 <button key={task.id} className={task.id === selectedTaskId ? "active" : ""} onClick={() => onSelect(task.id)}>
                   <small>{task.id}</small><strong>{task.title}</strong><PriorityBadge priority={task.priority} /><span>{isOverdue(task) ? "已逾期" : formatDateTime(task.dueAt)}</span>
@@ -605,7 +909,7 @@ function CompactTaskPanel({ tasks, selectedTaskId, onSelect, onCreate }: { tasks
   );
 }
 
-function CommandFileDeck({ docs, selectedIds, project, tasks, onToggle, onManage }: { docs: Doc[]; selectedIds: string[]; project?: Project; tasks: Task[]; onToggle: (id: string) => void; onManage: () => void }) {
+function CommandFileDeck({ docs, selectedIds, project, tasks, onToggle, onManage, canEdit }: { docs: Doc[]; selectedIds: string[]; project?: Project; tasks: Task[]; onToggle: (id: string) => void; onManage: () => void; canEdit: boolean }) {
   const [focusId, setFocusId] = useState(selectedIds[0] ?? docs[0]?.id ?? "");
   const pointerStart = useRef<number | null>(null);
   const focusIndex = Math.max(0, docs.findIndex((doc) => doc.id === focusId));
@@ -618,9 +922,9 @@ function CommandFileDeck({ docs, selectedIds, project, tasks, onToggle, onManage
   };
   return (
     <section className="command-files panel" aria-label="项目空间文件">
-      <header><div><span>项目文档</span><strong>{project?.name ?? "当前项目"}</strong></div><button onClick={onManage}>管理关联 ↗</button></header>
+      <header><div><span>项目文档</span><strong>{project?.name ?? "当前项目"}</strong></div><button disabled={!canEdit} onClick={onManage}>管理关联 ↗</button></header>
       <div className="command-file-stage" onPointerDown={(event) => { pointerStart.current = event.clientX; }} onPointerUp={(event) => { if (pointerStart.current === null) return; const distance = event.clientX - pointerStart.current; if (Math.abs(distance) > 32) move(distance > 0 ? -1 : 1); pointerStart.current = null; }}>
-        {activeDoc && <aside><span>项目文档</span><h3>{activeDoc.name}</h3><small>v{activeDoc.version} · {project?.name}</small><strong>{completion}%</strong><p>项目完成度</p><button className={selectedIds.includes(activeDoc.id) ? "linked" : ""} onClick={() => onToggle(activeDoc.id)}>{selectedIds.includes(activeDoc.id) ? "✓ 已关联当前任务" : "＋ 关联当前任务"}</button></aside>}
+        {activeDoc && <aside><span>项目文档</span><h3>{activeDoc.name}</h3><small>v{activeDoc.version} · {project?.name}</small><strong>{completion}%</strong><p>项目完成度</p><button disabled={!canEdit} className={selectedIds.includes(activeDoc.id) ? "linked" : ""} onClick={() => onToggle(activeDoc.id)}><span>{selectedIds.includes(activeDoc.id) ? "已关联" : "未关联"}</span><b>{selectedIds.includes(activeDoc.id) ? "取消" : "添加"}</b></button></aside>}
         <div className="command-file-deck">
           {docs.map((doc, index) => {
             let offset = index - focusIndex;
@@ -643,22 +947,22 @@ function CommandFileDeck({ docs, selectedIds, project, tasks, onToggle, onManage
   );
 }
 
-function CommandInspector({ task, workspace, onUpdate, onEdit, onDelete, onManageFiles, onAddComment, onCreateTask, announce }: { task: Task; workspace: WorkspaceState; onUpdate: (id: string, patch: Partial<Task>) => void; onEdit: () => void; onDelete: () => void; onManageFiles: () => void; onAddComment: (content: string) => void; onCreateTask: (answer: string) => void; announce: (message: string) => void }) {
+function CommandInspector({ task, workspace, onUpdate, onEdit, onDelete, onManageFiles, onAddComment, onCreateTask, wikiEnabled, canEdit, announce }: { task: Task; workspace: WorkspaceState; onUpdate: (id: string, patch: Partial<Task>) => void; onEdit: () => void; onDelete: () => void; onManageFiles: () => void; onAddComment: (content: string) => void; onCreateTask: (answer: string) => void; wikiEnabled: boolean; canEdit: boolean; announce: (message: string) => void }) {
   const member = workspace.members.find((item) => item.id === task.assigneeId);
   const project = workspace.projects.find((item) => item.id === task.projectId);
   const suggestion = isOverdue(task) ? "检测到任务已经逾期，建议调整截止时间并同步项目负责人。" : task.priority === "high" ? "建议关联相似历史文档，并为高优先级任务拆分验收节点。" : "当前任务风险可控，建议在截止日前完成一次状态复核。";
   return (
     <aside className="command-inspector panel">
-      <header><div><span>✦</span><strong>智能详情</strong></div><TaskMenu task={task} onUpdate={onUpdate} onEdit={onEdit} onDelete={onDelete} announce={announce} /></header>
+      <header><div><span><Icon name="sparkles" size={16} /></span><strong>智能详情</strong></div>{canEdit && <TaskMenu task={task} onUpdate={onUpdate} onEdit={onEdit} onDelete={onDelete} announce={announce} />}</header>
       <section className="inspector-title"><small>{task.id}</small><div><h2>{task.title}</h2><PriorityBadge priority={task.priority} /></div><p>{task.description}</p></section>
       <dl>
         <div><dt>负责人</dt><dd><Avatar label={member?.avatar ?? "?"} />{member?.name}</dd></div>
         <div><dt>所属项目</dt><dd>▱ {project?.name}</dd></div>
         <div><dt>截止时间</dt><dd>▣ {formatDateTime(task.dueAt)}</dd></div>
         <div><dt>当前状态</dt><dd><StatusBadge status={task.status} /></dd></div>
-        <div><dt>关联文件</dt><dd><button onClick={onManageFiles}>{task.docIds.length} 个 · 管理</button></dd></div>
+        <div><dt>关联文件</dt><dd><button disabled={!canEdit} onClick={onManageFiles}>{task.docIds.length} 个 · 管理</button></dd></div>
       </dl>
-      <section className="inspector-tags"><span>标签</span><div>{task.tags.map((tag) => <b key={tag}>{tag}</b>)}<button onClick={onEdit}>＋</button></div></section>
+      <section className="inspector-tags"><span>标签</span><div>{task.tags.map((tag) => <b key={tag}>{tag}</b>)}{canEdit && <button onClick={onEdit}>＋</button>}</div></section>
       <section className="inspector-ai"><span>AI 助手建议</span><p>• {suggestion}</p><p>• 当前项目共有 {workspace.tasks.filter((item) => item.projectId === task.projectId).length} 项任务，{workspace.tasks.filter((item) => item.projectId === task.projectId && item.status === "done").length} 项已完成。</p></section>
       <WikiKnowledgeAssistant
         key={task.id}
@@ -667,8 +971,10 @@ function CommandInspector({ task, workspace, onUpdate, onEdit, onDelete, onManag
         suggestedQuestions={["这个任务需要遵循哪些规则？", "帮我检查验收条件是否完整", "有哪些相关风险和遗漏？"]}
         onAddComment={(answer) => { onAddComment(`KAI 知识助手：\n${answer}`); announce("知识回答已引用到评论"); }}
         onCreateTask={onCreateTask}
+        enabled={wikiEnabled}
+        canWrite={canEdit}
       />
-      <footer><button onClick={onEdit}>✎ 编辑任务</button><button className="primary" onClick={() => onUpdate(task.id, { status: task.status === "done" ? "develop" : "done" })}>{task.status === "done" ? "重新打开" : "✓ 完成任务"}</button><button className="danger-icon" aria-label="删除任务" onClick={onDelete}>•••</button></footer>
+      {canEdit && <footer><button onClick={onEdit}><Icon name="edit" size={15} />编辑任务</button><button className="primary" onClick={() => onUpdate(task.id, { status: task.status === "done" ? "develop" : "done" })}>{task.status === "done" ? "重新打开" : <><Icon name="check" size={15} />完成任务</>}</button><button className="danger-icon" aria-label="删除任务" onClick={onDelete}><Icon name="more" size={17} /></button></footer>}
     </aside>
   );
 }
@@ -717,22 +1023,19 @@ function SpatialFilePicker({ docs, selectedIds, taskTitle, onClose, onSave, embe
   const [focusId, setFocusId] = useState(selectedIds[0] ?? docs[0]?.id ?? "");
   const pointerStart = useRef<number | null>(null);
   const wheelLocked = useRef(false);
-  const visible = docs.filter((doc) => `${doc.name}${doc.content}${doc.type}`.toLowerCase().includes(query.toLowerCase()));
-  const focusIndex = Math.max(0, visible.findIndex((doc) => doc.id === focusId));
+  const visible = useMemo(() => docs.filter((doc) => `${doc.name}${doc.content}${doc.type}`.toLowerCase().includes(query.toLowerCase())), [docs, query]);
+  const matchingIndex = visible.findIndex((doc) => doc.id === focusId);
+  const focusIndex = matchingIndex >= 0 ? matchingIndex : 0;
   const activeDoc = visible[focusIndex];
-  const toggle = (id: string) => setPicked((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
-  const move = (direction: number) => {
+  const toggle = useCallback((id: string) => setPicked((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]), []);
+  const move = useCallback((direction: number) => {
     if (!visible.length) return;
     setFocusId((current) => {
       const currentIndex = visible.findIndex((doc) => doc.id === current);
       const nextIndex = ((currentIndex < 0 ? 0 : currentIndex) + direction + visible.length) % visible.length;
       return visible[nextIndex].id;
     });
-  };
-
-  useEffect(() => {
-    if (visible.length && !visible.some((doc) => doc.id === focusId)) setFocusId(visible[0].id);
-  }, [focusId, visible]);
+  }, [visible]);
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
@@ -743,7 +1046,7 @@ function SpatialFilePicker({ docs, selectedIds, taskTitle, onClose, onSave, embe
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [activeDoc, onClose, visible]);
+  }, [activeDoc, move, onClose, toggle]);
 
   const picker = (
       <section className={`spatial-picker ${embedded ? "embedded" : ""}`} onMouseDown={(event) => event.stopPropagation()} aria-label={embedded ? "空间文件工作区" : "空间文件选择器"}>
@@ -978,7 +1281,7 @@ function AnalyticsView({ workspace }: { workspace: WorkspaceState }) {
   );
 }
 
-function WikiKnowledgeAssistant({ context, suggestedQuestions, compact = false, onAddComment, onCreateTask }: { context?: string; suggestedQuestions?: string[]; compact?: boolean; onAddComment?: (answer: string) => void; onCreateTask?: (answer: string) => void }) {
+function WikiKnowledgeAssistant({ context, suggestedQuestions, compact = false, enabled = true, canWrite = true, onAddComment, onCreateTask }: { context?: string; suggestedQuestions?: string[]; compact?: boolean; enabled?: boolean; canWrite?: boolean; onAddComment?: (answer: string) => void; onCreateTask?: (answer: string) => void }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -986,6 +1289,7 @@ function WikiKnowledgeAssistant({ context, suggestedQuestions, compact = false, 
   const [error, setError] = useState("");
 
   const ask = async (value?: string) => {
+    if (!enabled) { setError("登录后可使用 KAI 知识助手"); return; }
     const nextQuestion = (value ?? question).trim();
     if (!nextQuestion || loading) return;
     setQuestion(nextQuestion);
@@ -1016,20 +1320,22 @@ function WikiKnowledgeAssistant({ context, suggestedQuestions, compact = false, 
       <header><div><span>KAI / KNOWLEDGE</span><strong>KAI 知识助手</strong></div><a href="https://wiki.kai.com/" target="_blank" rel="noreferrer">打开 Wiki ↗</a></header>
       {!answer && <p className="wiki-assistant-intro">调用 wiki.kai.com 的知识库与快速问答工作流，为当前工作提供有依据的解释和建议。</p>}
       <form onSubmit={(event) => { event.preventDefault(); void ask(); }}>
-        <textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder={context ? "询问当前任务的规则、验收条件或风险…" : "询问 KAI 规则、流程、产品或知识库内容…"} rows={compact ? 2 : 3} />
-        <button className="primary" disabled={!question.trim() || loading}>{loading ? "检索中…" : "发送"}</button>
+        <textarea disabled={!enabled} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder={!enabled ? "登录后可连接 wiki.kai.com 知识服务" : context ? "询问当前任务的规则、验收条件或风险…" : "询问 KAI 规则、流程、产品或知识库内容…"} rows={compact ? 2 : 3} />
+        <button className="primary" disabled={!enabled || !question.trim() || loading}>{loading ? "检索中…" : "发送"}</button>
       </form>
-      {!answer && suggestedQuestions?.length ? <div className="wiki-suggestions">{suggestedQuestions.map((item) => <button key={item} onClick={() => void ask(item)}>{item}<span>↗</span></button>)}</div> : null}
+      {!answer && suggestedQuestions?.length ? <div className="wiki-suggestions">{suggestedQuestions.map((item) => <button disabled={!enabled} key={item} onClick={() => void ask(item)}>{item}<span>↗</span></button>)}</div> : null}
+      {!enabled && !error && <p className="wiki-error">当前为访客工作区，登录后即可检索 Wiki。</p>}
       {error && <p className="wiki-error">{error}</p>}
-      {answer && <div className="wiki-answer"><div className="wiki-answer-meta"><span>来自 wiki.kai.com</span><button onClick={() => { setAnswer(""); setQuestion(""); setConversationId(null); }}>新对话</button></div><div className="wiki-answer-content">{renderMarkdown(answer)}</div>{(onAddComment || onCreateTask) && <footer>{onAddComment && <button onClick={() => onAddComment(answer)}>引用到评论</button>}{onCreateTask && <button className="primary" onClick={() => onCreateTask(answer)}>生成跟进任务</button>}</footer>}</div>}
+      {answer && <div className="wiki-answer"><div className="wiki-answer-meta"><span>来自 wiki.kai.com</span><button onClick={() => { setAnswer(""); setQuestion(""); setConversationId(null); }}>新对话</button></div><div className="wiki-answer-content">{renderMarkdown(answer)}</div>{canWrite && (onAddComment || onCreateTask) && <footer>{onAddComment && <button onClick={() => onAddComment(answer)}>引用到评论</button>}{onCreateTask && <button className="primary" onClick={() => onCreateTask(answer)}>生成跟进任务</button>}</footer>}</div>}
     </section>
   );
 }
 
-function WikiCatalogPanel() {
+function WikiCatalogPanel({ enabled }: { enabled: boolean }) {
   const [catalog, setCatalog] = useState<WikiCatalog | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
+    if (!enabled) return;
     fetch("/api/wiki/catalog")
       .then(async (response) => {
         const result = await response.json() as WikiCatalog & { error?: string };
@@ -1038,13 +1344,13 @@ function WikiCatalogPanel() {
       })
       .then(setCatalog)
       .catch((error) => setError(error instanceof Error ? error.message : "读取失败"));
-  }, []);
+  }, [enabled]);
   const featured = catalog?.knowledgeBases.filter((item) => item.documentCount > 0 && (item.name.includes("KAI") || item.name.includes("期算") || item.name.includes("模型服务"))).slice(0, 6) ?? [];
   const activeFlow = catalog?.flows.find((item) => item.name.includes("快速问答API") && item.status === "active");
-  return <section className="wiki-catalog"><header><div><span>WIKI SOURCES</span><strong>在线知识源</strong></div><a href="https://wiki.kai.com/kb" target="_blank" rel="noreferrer">管理 ↗</a></header>{featured.map((item) => <article key={item.id}><i></i><div><strong>{item.name}</strong><small>{item.documentCount} 个文档 · {item.embeddingModel}</small></div><span>{item.status}</span></article>)}{activeFlow && <div className="wiki-flow"><span>ACTIVE FLOW</span><strong>{activeFlow.name}</strong><small>{activeFlow.description}</small></div>}{!catalog && !error && <p>正在读取 Wiki 目录…</p>}{error && <p>{error}</p>}</section>;
+  return <section className="wiki-catalog"><header><div><span>WIKI SOURCES</span><strong>在线知识源</strong></div><a href="https://wiki.kai.com/kb" target="_blank" rel="noreferrer">管理 ↗</a></header>{featured.map((item) => <article key={item.id}><i></i><div><strong>{item.name}</strong><small>{item.documentCount} 个文档 · {item.embeddingModel}</small></div><span>{item.status}</span></article>)}{activeFlow && <div className="wiki-flow"><span>ACTIVE FLOW</span><strong>{activeFlow.name}</strong><small>{activeFlow.description}</small></div>}{enabled && !catalog && !error && <p>正在读取 Wiki 目录…</p>}{!enabled && <p>登录后显示在线知识源。</p>}{error && <p>{error}</p>}</section>;
 }
 
-function KnowledgeBase({ workspace, search, selectedDocId, selectedTaskId, onSelect, onChange, onCreate, onAddComment, onCreateKnowledgeTask, announce }: { workspace: WorkspaceState; search: string; selectedDocId: string; selectedTaskId: string; onSelect: (id: string) => void; onChange: (patch: Partial<WorkspaceState>) => void; onCreate: () => void; onAddComment: (taskId: string, content: string) => void; onCreateKnowledgeTask: (sourceTask: Task, answer: string) => void; announce: (message: string) => void }) {
+function KnowledgeBase({ workspace, search, selectedDocId, selectedTaskId, wikiEnabled, canEdit, onSelect, onChange, onCreate, onAddComment, onCreateKnowledgeTask, announce }: { workspace: WorkspaceState; search: string; selectedDocId: string; selectedTaskId: string; wikiEnabled: boolean; canEdit: boolean; onSelect: (id: string) => void; onChange: (patch: Partial<WorkspaceState>) => void; onCreate: () => void; onAddComment: (taskId: string, content: string) => void; onCreateKnowledgeTask: (sourceTask: Task, answer: string) => void; announce: (message: string) => void }) {
   const docs = workspace.docs.filter((doc) => `${doc.name}${doc.content}`.toLowerCase().includes(search.toLowerCase()));
   const selected = workspace.docs.find((doc) => doc.id === selectedDocId) ?? docs[0];
   const selectedTask = workspace.tasks.find((task) => task.id === selectedTaskId);
@@ -1055,14 +1361,27 @@ function KnowledgeBase({ workspace, search, selectedDocId, selectedTaskId, onSel
   };
   return (
     <div className="knowledge-layout">
-      <aside className="knowledge-sidebar panel"><div className="section-title compact"><div><h2>本地文档</h2><p>{docs.length} 篇 · KaiArmy</p></div><button onClick={onCreate}>＋</button></div>{docs.map((doc) => <button className={selected?.id === doc.id ? "active" : ""} key={doc.id} onClick={() => onSelect(doc.id)}><i>▤</i><div><strong>{doc.name}</strong><small>{doc.type.toUpperCase()} · v{doc.version}</small></div>{doc.favorite && <span>★</span>}</button>)}<WikiCatalogPanel /></aside>
-      <div className="knowledge-main"><WikiKnowledgeAssistant context={selectedTask ? taskKnowledgeContext(selectedTask, workspace) : selected ? `当前文档：${selected.name}\n类型：${selected.type.toUpperCase()}\n摘要：${selected.content}` : undefined} suggestedQuestions={["期算平台的核心规则是什么？", "如何检查一个 PRD 是否完整？", "平台有哪些主要风险控制机制？"]} onAddComment={selectedTask ? (answer) => { onAddComment(selectedTask.id, `KAI 知识助手：\n${answer}`); announce("知识回答已引用到当前任务评论"); } : undefined} onCreateTask={selectedTask ? (answer) => onCreateKnowledgeTask(selectedTask, answer) : undefined} />{selected && <article className="knowledge-article panel"><header><div><span>{selected.type.toUpperCase()} · KAIARMY LOCAL</span><small>更新于 {formatDateTime(selected.updatedAt)}</small></div><button onClick={linkToTask} disabled={!selectedTaskId || selected.taskIds.includes(selectedTaskId)}>＋ 关联当前任务</button></header><h1>{selected.name}</h1><p>{selected.content}</p><div className="article-block"><h3>知识联动</h3><p>当前文档可作为提问上下文；第一阶段答案来自 wiki.kai.com，后续阶段将支持自动同步和索引状态。</p></div><section><h3>已关联任务</h3>{workspace.tasks.filter((task) => selected.taskIds.includes(task.id)).map((task) => <article key={task.id}><StatusBadge status={task.status} /><strong>{task.title}</strong><span>{task.id}</span></article>)}</section></article>}</div>
+      <aside className="knowledge-sidebar panel"><div className="section-title compact"><div><h2>本地文档</h2><p>{docs.length} 篇 · KaiArmy</p></div><button disabled={!canEdit} onClick={onCreate}>＋</button></div>{docs.map((doc) => <button className={selected?.id === doc.id ? "active" : ""} key={doc.id} onClick={() => onSelect(doc.id)}><i>▤</i><div><strong>{doc.name}</strong><small>{doc.type.toUpperCase()} · v{doc.version}</small></div>{doc.favorite && <span>★</span>}</button>)}<WikiCatalogPanel enabled={wikiEnabled} /></aside>
+      <div className="knowledge-main"><WikiKnowledgeAssistant enabled={wikiEnabled} canWrite={canEdit} context={selectedTask ? taskKnowledgeContext(selectedTask, workspace) : selected ? `当前文档：${selected.name}\n类型：${selected.type.toUpperCase()}\n摘要：${selected.content}` : undefined} suggestedQuestions={["期算平台的核心规则是什么？", "如何检查一个 PRD 是否完整？", "平台有哪些主要风险控制机制？"]} onAddComment={selectedTask ? (answer) => { onAddComment(selectedTask.id, `KAI 知识助手：\n${answer}`); announce("知识回答已引用到当前任务评论"); } : undefined} onCreateTask={selectedTask ? (answer) => onCreateKnowledgeTask(selectedTask, answer) : undefined} />{selected && <article className="knowledge-article panel"><header><div><span>{selected.type.toUpperCase()} · KAIARMY LOCAL</span><small>更新于 {formatDateTime(selected.updatedAt)}</small></div><button onClick={linkToTask} disabled={!canEdit || !selectedTaskId || selected.taskIds.includes(selectedTaskId)}>＋ 关联当前任务</button></header><h1>{selected.name}</h1><p>{selected.content}</p><div className="article-block"><h3>知识联动</h3><p>当前文档可作为提问上下文；第一阶段答案来自 wiki.kai.com，后续阶段将支持自动同步和索引状态。</p></div><section><h3>已关联任务</h3>{workspace.tasks.filter((task) => selected.taskIds.includes(task.id)).map((task) => <article key={task.id}><StatusBadge status={task.status} /><strong>{task.title}</strong><span>{task.id}</span></article>)}</section></article>}</div>
     </div>
   );
 }
 
-function SettingsView({ workspace, onChange, announce }: { workspace: WorkspaceState; onChange: (patch: Partial<WorkspaceState>) => void; announce: (message: string) => void }) {
+function SettingsView({ workspace, onChange, announce, user, activeWorkspace, workspaces, onWorkspacesChange, onSwitchWorkspace, onReloadWorkspace, onUserChange }: { workspace: WorkspaceState; onChange: (patch: Partial<WorkspaceState>) => void; announce: (message: string) => void; user: AuthUser | null; activeWorkspace: ProductWorkspace | null; workspaces: ProductWorkspace[]; onWorkspacesChange: (items: ProductWorkspace[]) => void; onSwitchWorkspace: (id: string) => void; onReloadWorkspace: () => Promise<void>; onUserChange: (user: AuthUser) => void }) {
   const settings = workspace.settings;
+  const [members, setMembers] = useState<ProductMember[]>([]);
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"editor" | "viewer">("editor");
+  const [accountName, setAccountName] = useState(user?.displayName ?? "");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const importRef = useRef<HTMLInputElement | null>(null);
+  const canManage = activeWorkspace?.role === "owner";
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/workspaces/members").then((response) => response.json()).then((data: { members?: ProductMember[] }) => setMembers(data.members ?? [])).catch(() => setMembers([]));
+  }, [user, activeWorkspace?.id]);
   const update = (patch: Partial<WorkspaceState["settings"]>) => onChange({ settings: { ...settings, ...patch } });
   const exportData = () => {
     const blob = new Blob([JSON.stringify(workspace, null, 2)], { type: "application/json" });
@@ -1072,22 +1391,89 @@ function SettingsView({ workspace, onChange, announce }: { workspace: WorkspaceS
     URL.revokeObjectURL(url);
     announce("工作区数据已导出");
   };
+  const importData = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file || file.size > 1_000_000) { announce("导入文件无效或超过 1MB"); return; }
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      if (!validateWorkspace(parsed)) throw new Error("invalid");
+      onChange(parsed);
+      announce("工作区数据已导入，正在保存");
+    } catch {
+      announce("JSON 格式或工作区结构无效");
+    } finally {
+      if (importRef.current) importRef.current.value = "";
+    }
+  };
+  const createWorkspace = async () => {
+    const name = workspaceName.trim();
+    if (!name) return;
+    const response = await fetch("/api/workspaces", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+    const result = await response.json() as { workspace?: ProductWorkspace; error?: string };
+    if (!response.ok || !result.workspace) { announce(result.error || "创建工作区失败"); return; }
+    onWorkspacesChange([...workspaces, result.workspace]);
+    setWorkspaceName("");
+    await onSwitchWorkspace(result.workspace.id);
+    announce("新工作区已创建");
+  };
+  const inviteMember = async () => {
+    const response = await fetch("/api/workspaces/members", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: inviteEmail, role: inviteRole }) });
+    const result = await response.json() as { member?: ProductMember; version?: number; error?: string };
+    if (!response.ok || !result.member) { announce(result.error || "邀请成员失败"); return; }
+    await onReloadWorkspace();
+    setMembers((current) => [...current, result.member!]);
+    setInviteEmail("");
+    onWorkspacesChange(workspaces.map((item) => item.id === activeWorkspace?.id ? { ...item, memberCount: item.memberCount + 1 } : item));
+    announce("成员已加入工作区");
+  };
+  const removeMember = async (member: ProductMember) => {
+    if (!window.confirm(`确定移除 ${member.displayName}？`)) return;
+    const response = await fetch("/api/workspaces/members", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: member.id }) });
+    const result = await response.json() as { version?: number; error?: string };
+    if (!response.ok) { announce(result.error || "移除成员失败"); return; }
+    await onReloadWorkspace();
+    setMembers((current) => current.filter((item) => item.id !== member.id));
+    onWorkspacesChange(workspaces.map((item) => item.id === activeWorkspace?.id ? { ...item, memberCount: Math.max(1, item.memberCount - 1) } : item));
+    announce("成员已移除");
+  };
+  const saveProfile = async () => {
+    const response = await fetch("/api/auth/profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ displayName: accountName }) });
+    const result = await response.json() as { user?: AuthUser; error?: string };
+    if (!response.ok || !result.user) { announce(result.error || "更新资料失败"); return; }
+    onUserChange(result.user);
+    announce("账号资料已更新");
+  };
+  const changePassword = async () => {
+    const response = await fetch("/api/auth/password", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ currentPassword, newPassword }) });
+    const result = await response.json() as { error?: string };
+    if (!response.ok) { announce(result.error || "修改密码失败"); return; }
+    setCurrentPassword(""); setNewPassword("");
+    announce("密码已修改，请重新登录");
+    window.setTimeout(() => window.location.reload(), 800);
+  };
   return (
     <div className="settings-layout">
-      <section className="panel settings-section"><header><div><h2>个人资料</h2><p>用于任务负责人和评论署名</p></div><Avatar label="BR" /></header><label>显示名称<input value={settings.displayName} onChange={(event) => update({ displayName: event.target.value })} /></label><label>工作区名称<input value={settings.workspaceName} onChange={(event) => update({ workspaceName: event.target.value })} /></label></section>
+      <section className="panel settings-section"><header><div><h2>工作区资料</h2><p>用于当前项目空间的名称和署名</p></div><Avatar label={user ? initials(user.displayName) : "访"} /></header><label>工作区内显示名称<input value={settings.displayName} onChange={(event) => update({ displayName: event.target.value })} disabled={activeWorkspace?.role === "viewer"} /></label><label>工作区名称<input value={settings.workspaceName} onChange={(event) => update({ workspaceName: event.target.value })} disabled={Boolean(activeWorkspace && activeWorkspace.role !== "owner")} /></label>{activeWorkspace?.role === "editor" && <p className="settings-empty">仅所有者可修改共享工作区名称。</p>}</section>
       <section className="panel settings-section"><header><div><h2>通知偏好</h2><p>选择需要接收的任务提醒</p></div></header><Toggle label="站内通知" detail="任务指派、评论与截止时间" checked={settings.inAppNotifications} onChange={(checked) => update({ inAppNotifications: checked })} /><Toggle label="邮件通知" detail="每日摘要和高风险提醒" checked={settings.emailNotifications} onChange={(checked) => update({ emailNotifications: checked })} /></section>
       <section className="panel settings-section"><header><div><h2>界面偏好</h2><p>主题外观与信息密度</p></div></header><div className="theme-row"><div><strong>主题外观</strong><small>暗色专业权威 / 亮色清爽明快</small></div><div className="theme-switch"><button className={(settings.theme ?? "dark") === "dark" ? "active" : ""} onClick={() => update({ theme: "dark" })}>◑ 暗色</button><button className={settings.theme === "light" ? "active" : ""} onClick={() => update({ theme: "light" })}>◐ 亮色</button></div></div><Toggle label="紧凑模式" detail="减少卡片间距，展示更多内容" checked={settings.compactMode} onChange={(checked) => update({ compactMode: checked })} /></section>
-      <section className="panel settings-section danger-zone"><header><div><h2>数据管理</h2><p>导出或重置当前工作区</p></div></header><div><button onClick={exportData}>↓ 导出 JSON</button><button className="danger-button" onClick={() => { if (!window.confirm("确定恢复演示数据？当前修改将被覆盖。")) return; onChange(defaultWorkspace); announce("已恢复演示数据"); }}>恢复演示数据</button></div></section>
+      <section className="panel settings-section"><header><div><h2>工作区管理</h2><p>{user ? "创建并切换独立工作区" : "登录后可使用多个云端工作区"}</p></div></header>{user ? <><label>当前工作区<select value={activeWorkspace?.id ?? ""} onChange={(event) => void onSwitchWorkspace(event.target.value)}>{workspaces.map((item) => <option value={item.id} key={item.id}>{item.name} · {item.role === "owner" ? "所有者" : item.role === "editor" ? "可编辑" : "只读"}</option>)}</select></label><div className="settings-inline"><input value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} placeholder="新工作区名称" /><button className="primary" disabled={workspaceName.trim().length < 2} onClick={() => void createWorkspace()}>创建</button></div></> : <p className="settings-empty">当前为访客本地工作区，点击左下角登录即可创建云端空间。</p>}</section>
+      {user && <section className="panel settings-section workspace-members"><header><div><h2>真实成员</h2><p>成员需先注册 KaiArmy，再通过邮箱加入</p></div><span>{members.length}</span></header>{canManage && <div className="member-invite"><input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="member@company.com" /><select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as "editor" | "viewer")}><option value="editor">可编辑</option><option value="viewer">只读</option></select><button className="primary" disabled={!inviteEmail.includes("@")} onClick={() => void inviteMember()}>添加</button></div>}<div className="workspace-member-list">{members.map((member) => <article key={member.id}><Avatar label={initials(member.displayName)} /><div><strong>{member.displayName}</strong><small>{member.email}</small></div><span>{member.role === "owner" ? "所有者" : member.role === "editor" ? "可编辑" : "只读"}</span>{canManage && member.role !== "owner" && <button onClick={() => void removeMember(member)}>移除</button>}</article>)}</div></section>}
+      {user && <section className="panel settings-section"><header><div><h2>账号安全</h2><p>修改账号名称和登录密码</p></div></header><label>账号显示名称<input value={accountName} onChange={(event) => setAccountName(event.target.value)} /></label><button className="settings-save" disabled={accountName.trim().length < 2} onClick={() => void saveProfile()}>保存账号资料</button><label>当前密码<input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" /></label><label>新密码<input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={10} autoComplete="new-password" /></label><button className="settings-save" disabled={!currentPassword || newPassword.length < 10} onClick={() => void changePassword()}>修改密码</button></section>}
+      <section className="panel settings-section danger-zone"><header><div><h2>数据管理</h2><p>备份、导入或重置当前工作区</p></div></header><div><button onClick={exportData}>↓ 导出 JSON</button><button onClick={() => importRef.current?.click()}>↑ 导入 JSON</button><input ref={importRef} type="file" accept="application/json,.json" hidden onChange={(event) => void importData(event.target.files)} /><button className="danger-button" disabled={activeWorkspace?.role === "viewer"} onClick={() => { if (!window.confirm("确定清空为全新工作区？当前修改将被覆盖。")) return; onChange(createEmptyWorkspace(settings.workspaceName, user?.displayName ?? settings.displayName, user?.id ?? "guest")); announce("已清空当前工作区"); }}>清空工作区</button></div></section>
     </div>
   );
 }
 
 function TaskFormModal({ workspace, task, preset, onClose, onSave }: { workspace: WorkspaceState; task?: Task; preset?: Partial<Task>; onClose: () => void; onSave: (task: Task) => void }) {
-  const [draft, setDraft] = useState<Task>(task ?? {
-    id: `KAI-${String(workspace.tasks.length + 1).padStart(3, "0")}`,
-    title: preset?.title ?? "", description: preset?.description ?? "", projectId: preset?.projectId ?? workspace.projects.find((project) => !project.archived)?.id ?? "",
-    assigneeId: preset?.assigneeId ?? workspace.members[0]?.id ?? "", participantIds: preset?.participantIds ?? [], status: preset?.status ?? "todo", priority: preset?.priority ?? "medium",
-    dueAt: preset?.dueAt ?? new Date(Date.now() + 86400000).toISOString(), tags: preset?.tags ?? [], docIds: preset?.docIds ?? [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  const [draft, setDraft] = useState<Task>(() => {
+    if (task) return task;
+    const createdAt = new Date().toISOString();
+    return {
+      id: `KAI-${String(workspace.tasks.length + 1).padStart(3, "0")}`,
+      title: preset?.title ?? "", description: preset?.description ?? "", projectId: preset?.projectId ?? workspace.projects.find((project) => !project.archived)?.id ?? "",
+      assigneeId: preset?.assigneeId ?? workspace.members[0]?.id ?? "", participantIds: preset?.participantIds ?? [], status: preset?.status ?? "todo", priority: preset?.priority ?? "medium",
+      dueAt: preset?.dueAt ?? new Date(new Date(createdAt).getTime() + 86400000).toISOString(), tags: preset?.tags ?? [], docIds: preset?.docIds ?? [], createdAt, updatedAt: createdAt,
+    };
   });
   const [tags, setTags] = useState(draft.tags.join("，"));
   return <Modal title={task ? "编辑任务" : "新建任务"} subtitle="建立明确的负责人、状态和截止时间" onClose={onClose} onSubmit={() => onSave({ ...draft, tags: tags.split(/[，,]/).map((item) => item.trim()).filter(Boolean), updatedAt: new Date().toISOString() })} disabled={!draft.title.trim()}>
@@ -1212,7 +1598,7 @@ function DocFileList({ files, onOpen, onUpload, onDelete, onOversize }: { files:
   );
 }
 
-function FileViewerModal({ docName, file, onClose, onSave, onReplace, onOversize }: { docName: string; file: DocFile; onClose: () => void; onSave: (patch: Partial<DocFile>) => void; onReplace: (patch: Partial<DocFile>) => void; onOversize: () => void }) {
+function FileViewerModal({ docName, file, readOnly, onClose, onSave, onReplace, onOversize }: { docName: string; file: DocFile; readOnly: boolean; onClose: () => void; onSave: (patch: Partial<DocFile>) => void; onReplace: (patch: Partial<DocFile>) => void; onOversize: () => void }) {
   const editable = EDITABLE_KINDS.includes(file.kind);
   const [text, setText] = useState(file.text ?? "");
   const [mdPreview, setMdPreview] = useState(false);
@@ -1262,11 +1648,11 @@ function FileViewerModal({ docName, file, onClose, onSave, onReplace, onOversize
         <div className="file-viewer-body">
           {file.kind === "md" && (mdPreview
             ? <div className="md-preview">{renderMarkdown(text)}</div>
-            : <textarea className="file-editor" value={text} onChange={(event) => setText(event.target.value)} spellCheck={false} />)}
-          {file.kind === "txt" && <textarea className="file-editor" value={text} onChange={(event) => setText(event.target.value)} spellCheck={false} />}
+            : <textarea readOnly={readOnly} className="file-editor" value={text} onChange={(event) => setText(event.target.value)} spellCheck={false} />)}
+          {file.kind === "txt" && <textarea readOnly={readOnly} className="file-editor" value={text} onChange={(event) => setText(event.target.value)} spellCheck={false} />}
           {file.kind === "csv" && (csvMode === "table"
-            ? <div className="csv-scroll"><table className="csv-table"><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, colIndex) => <td key={colIndex}><input value={cell} onChange={(event) => setCell(rowIndex, colIndex, event.target.value)} className={rowIndex === 0 ? "csv-head" : ""} /></td>)}</tr>)}</tbody></table></div>
-            : <textarea className="file-editor" value={text} onChange={(event) => setText(event.target.value)} spellCheck={false} />)}
+            ? <div className="csv-scroll"><table className="csv-table"><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, colIndex) => <td key={colIndex}><input readOnly={readOnly} value={cell} onChange={(event) => setCell(rowIndex, colIndex, event.target.value)} className={rowIndex === 0 ? "csv-head" : ""} /></td>)}</tr>)}</tbody></table></div>
+            : <textarea readOnly={readOnly} className="file-editor" value={text} onChange={(event) => setText(event.target.value)} spellCheck={false} />)}
           {file.kind === "pdf" && (file.dataUrl
             ? <iframe className="pdf-frame" src={file.dataUrl} title={file.name} />
             : <div className="file-placeholder"><span>▤</span><strong>暂无可预览的 PDF</strong><p>点击下方“替换文件”上传 PDF 后即可内嵌预览。</p></div>)}
@@ -1276,12 +1662,12 @@ function FileViewerModal({ docName, file, onClose, onSave, onReplace, onOversize
           <div className="file-viewer-modes">
             {file.kind === "md" && <button onClick={() => setMdPreview((value) => !value)}>{mdPreview ? "✎ 编辑" : "◉ 预览"}</button>}
             {file.kind === "csv" && <button onClick={() => setCsvMode((value) => value === "table" ? "raw" : "table")}>{csvMode === "table" ? "≣ 原始文本" : "▦ 表格"}</button>}
-            <button onClick={() => replaceRef.current?.click()}>↑ 替换文件</button>
-            <input ref={replaceRef} type="file" accept=".md,.markdown,.csv,.txt,.pdf,.docx,.doc" hidden onChange={(event) => handleReplace(event.target.files)} />
+            {!readOnly && <button onClick={() => replaceRef.current?.click()}>↑ 替换文件</button>}
+            {!readOnly && <input ref={replaceRef} type="file" accept=".md,.markdown,.csv,.txt,.pdf,.docx,.doc" hidden onChange={(event) => handleReplace(event.target.files)} />}
           </div>
           <div className="file-viewer-actions">
             <button onClick={download}>↓ 下载</button>
-            {editable && <button className="primary" disabled={!dirty} onClick={() => onSave({ text, size: new Blob([text]).size })}>保存</button>}
+            {editable && !readOnly && <button className="primary" disabled={!dirty} onClick={() => onSave({ text, size: new Blob([text]).size })}>保存</button>}
           </div>
         </footer>
       </div>
@@ -1290,7 +1676,7 @@ function FileViewerModal({ docName, file, onClose, onSave, onReplace, onOversize
 }
 
 function Modal({ title, subtitle, onClose, onSubmit, disabled, submitLabel = "保存", children }: { title: string; subtitle: string; onClose: () => void; onSubmit: () => void; disabled?: boolean; submitLabel?: string; children: React.ReactNode }) {
-  return <div className="modal-backdrop" onMouseDown={onClose}><form className="modal panel" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); onSubmit(); }}><header><div><h2>{title}</h2><p>{subtitle}</p></div><button type="button" onClick={onClose}>×</button></header><div className="modal-grid">{children}</div><footer><button type="button" onClick={onClose}>取消</button><button className="primary" disabled={disabled}>{submitLabel}</button></footer></form></div>;
+  return <div className="modal-backdrop" onMouseDown={onClose}><form className="modal panel" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); onSubmit(); }}><header><div><h2>{title}</h2><p>{subtitle}</p></div><button type="button" aria-label="关闭" onClick={onClose}><Icon name="close" size={18} /></button></header><div className="modal-grid">{children}</div><footer><button type="button" onClick={onClose}>取消</button><button className="primary" disabled={disabled}>{submitLabel}</button></footer></form></div>;
 }
 
 async function copyText(value: string, announce: (message: string) => void, label: string) {
@@ -1316,14 +1702,14 @@ function TaskMenu({ task, onUpdate, onEdit, onDelete, announce }: { task: Task; 
   const run = (fn: () => void) => { fn(); setOpen(false); };
   return (
     <div className="menu-anchor" ref={ref}>
-      <button aria-label="更多操作" aria-expanded={open} onClick={() => setOpen((value) => !value)}>•••</button>
+      <button aria-label="更多操作" aria-expanded={open} onClick={() => setOpen((value) => !value)}><Icon name="more" size={18} /></button>
       {open && (
         <div className="menu-popover" role="menu">
-          <button role="menuitem" onClick={() => run(() => onEdit())}>✎ 编辑详情</button>
-          <button role="menuitem" onClick={() => run(() => onUpdate(task.id, { status: task.status === "done" ? "develop" : "done" }))}>{task.status === "done" ? "↺ 重新打开" : "✓ 标记完成"}</button>
+          <button role="menuitem" onClick={() => run(() => onEdit())}><Icon name="edit" size={16} />编辑详情</button>
+          <button role="menuitem" onClick={() => run(() => onUpdate(task.id, { status: task.status === "done" ? "develop" : "done" }))}><Icon name="check" size={16} />{task.status === "done" ? "重新打开" : "标记完成"}</button>
           <button role="menuitem" onClick={() => run(() => copyText(task.id, announce, "任务 ID"))}>⧉ 复制任务 ID</button>
           <button role="menuitem" onClick={() => run(() => copyText(task.title, announce, "标题"))}>⧉ 复制标题</button>
-          <button role="menuitem" className="danger" onClick={() => run(() => onDelete())}>🗑 删除任务</button>
+          <button role="menuitem" className="danger" onClick={() => run(() => onDelete())}><Icon name="trash" size={16} />删除任务</button>
         </div>
       )}
     </div>
